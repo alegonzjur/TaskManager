@@ -1,0 +1,15 @@
+name: taskmanager
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11.*
+  - pip>=23.0
+  - setuptools>=65.0
+  - pip:
+    - flask==3.0.0
+    - flask-sqlalchemy==3.1.1
+    - flask-login==0.6.3
+    - psycopg2-binary==2.9.9
+    - python-dotenv==1.0.0
+    - werkzeug==3.0.1
