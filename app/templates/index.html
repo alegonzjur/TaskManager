@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Inicio - Task Manager{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="jumbotron bg-light p-5 rounded">
+            <h1 class="display-4">
+                <i class="fas fa-tasks text-primary"></i> 
+                Bienvenido a Task Manager
+            </h1>
+            <p class="lead">
+                Sistema de gestión y asignación de tareas para equipos pequeños con capacidad de crecimiento.
+            </p>
+            <hr class="my-4">
+            <p>
+                Gestiona las tareas de tu equipo de forma eficiente, mantén un historial completo 
+                y visualiza en tiempo real qué está haciendo cada empleado.
+            </p>
+            <div class="mt-4">
+                <a class="btn btn-primary btn-lg me-2" href="{{ url_for('main.dashboard') }}" role="button">
+                    <i class="fas fa-chart-line"></i> Ver Dashboard
+                </a>
+                <a class="btn btn-success btn-lg me-2" href="{{ url_for('assignments.index') }}" role="button">
+                    <i class="fas fa-clipboard-list"></i> Ver Asignaciones
+                </a>
+                <a class="btn btn-info btn-lg" href="{{ url_for('employees.index') }}" role="button">
+                    <i class="fas fa-users"></i> Gestionar Empleados
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-users fa-3x text-primary mb-3"></i>
+                <h5 class="card-title">Empleados</h5>
+                <p class="card-text">
+                    Gestiona tu equipo: añade, edita y visualiza información de cada empleado.
+                </p>
+                <a href="{{ url_for('employees.index') }}" class="btn btn-primary">
+                    Gestionar
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-list-check fa-3x text-success mb-3"></i>
+                <h5 class="card-title">Tareas</h5>
+                <p class="card-text">
+                    Administra el catálogo de tareas preestablecidas y añade nuevas cuando sea necesario.
+                </p>
+                <a href="{{ url_for('tasks.index') }}" class="btn btn-success">
+                    Gestionar
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-clipboard-list fa-3x text-info mb-3"></i>
+                <h5 class="card-title">Asignaciones</h5>
+                <p class="card-text">
+                    Asigna tareas a empleados y realiza seguimiento en tiempo real del progreso.
+                </p>
+                <a href="{{ url_for('assignments.index') }}" class="btn btn-info">
+                    Ver
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-clock"></i> 
+                    Asignaciones Actuales
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="current-assignments-container">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Cargar asignaciones actuales
+async function loadCurrentAssignments() {
+    try {
+        const response = await axios.get('/api/current-assignments');
+        const assignments = response.data.assignments;
+        
+        const container = document.getElementById('current-assignments-container');
+        
+        if (assignments.length === 0) {
+            container.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> 
+                    No hay asignaciones en progreso en este momento.
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '<div class="table-responsive"><table class="table table-striped table-hover">';
+        html += '<thead><tr>';
+        html += '<th>Empleado</th>';
+        html += '<th>Tarea</th>';
+        html += '<th>Inicio</th>';
+        html += '<th>Tiempo Transcurrido</th>';
+        html += '</tr></thead><tbody>';
+        
+        assignments.forEach(assignment => {
+            const startTime = new Date(assignment.start_time);
+            const elapsed = Math.floor((new Date() - startTime) / 60000); // minutos
+            
+            html += '<tr>';
+            html += `<td><i class="fas fa-user"></i> ${assignment.employee_name}</td>`;
+            html += `<td><i class="fas fa-tasks"></i> ${assignment.task_name}</td>`;
+            html += `<td>${startTime.toLocaleString('es-ES')}</td>`;
+            html += `<td><span class="badge bg-info">${elapsed} minutos</span></td>`;
+            html += '</tr>';
+        });
+        
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error al cargar asignaciones:', error);
+        document.getElementById('current-assignments-container').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i> 
+                Error al cargar las asignaciones actuales.
+            </div>
+        `;
+    }
+}
+
+// Cargar al iniciar la página
+document.addEventListener('DOMContentLoaded', function() {
+    loadCurrentAssignments();
+    
+    // Actualizar cada 30 segundos
+    setInterval(loadCurrentAssignments, 30000);
+});
+</script>
+{% endblock %}

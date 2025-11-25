@@ -1,134 +1,154 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
-from flask_login import login_required, current_user
-from datetime import datetime
+from flask import Blueprint, render_template, request, jsonify
 from app import db
-from app.models import Task, TaskAssignment, User
+from app.models import Task, TaskAssignment
 
 bp = Blueprint('tasks', __name__, url_prefix='/tasks')
 
 
-@bp.route('/assign/<int:task_id>', methods=['POST'])
-@login_required
-def assign_task(task_id):
-    """Asignar una tarea al usuario actual"""
+@bp.route('/')
+def index():
+    """Lista de tareas"""
+    return render_template('tasks/index.html')
+
+
+@bp.route('/api')
+def get_tasks():
+    """API para obtener todas las tareas"""
+    active_only = request.args.get('active_only', 'false').lower() == 'true'
+    category = request.args.get('category')
+    
+    query = Task.query
+    
+    if active_only:
+        query = query.filter_by(is_active=True)
+    
+    if category:
+        query = query.filter_by(category=category)
+    
+    tasks = query.order_by(Task.name).all()
+    
+    return jsonify({
+        'tasks': [task.to_dict() for task in tasks]
+    })
+
+
+@bp.route('/api/categories')
+def get_categories():
+    """API para obtener todas las categorías de tareas"""
+    categories = db.session.query(Task.category).distinct().filter(
+        Task.category.isnot(None),
+        Task.is_active == True
+    ).all()
+    
+    return jsonify({
+        'categories': [cat[0] for cat in categories if cat[0]]
+    })
+
+
+@bp.route('/api/<int:task_id>')
+def get_task(task_id):
+    """API para obtener una tarea específica"""
     task = Task.query.get_or_404(task_id)
-    
-    # Verificar si ya tiene una tarea activa
-    current_task = current_user.get_current_task()
-    if current_task:
-        flash('Ya tienes una tarea activa. Complétala primero.', 'warning')
-        return redirect(url_for('main.index'))
-    
-    # Crear nueva asignación
-    assignment = TaskAssignment(
-        user_id=current_user.id,
-        task_id=task.id
-    )
-    
-    db.session.add(assignment)
-    db.session.commit()
-    
-    flash(f'Tarea "{task.name}" asignada correctamente', 'success')
-    return redirect(url_for('main.index'))
+    return jsonify(task.to_dict())
 
 
-@bp.route('/complete/<int:assignment_id>', methods=['POST'])
-@login_required
-def complete_task(assignment_id):
-    """Completar una tarea asignada"""
-    assignment = TaskAssignment.query.get_or_404(assignment_id)
-    
-    # Verificar que la tarea pertenece al usuario actual
-    if assignment.user_id != current_user.id and not current_user.is_admin:
-        flash('No tienes permisos para completar esta tarea', 'error')
-        return redirect(url_for('main.index'))
-    
-    # Obtener notas si las hay
-    notes = request.form.get('notes', '')
-    
-    # Completar la tarea
-    assignment.complete()
-    assignment.notes = notes
-    
-    db.session.commit()
-    
-    flash('Tarea completada correctamente', 'success')
-    return redirect(url_for('main.index'))
-
-
-@bp.route('/manage')
-@login_required
-def manage_tasks():
-    """Vista para gestionar tareas (solo admins)"""
-    if not current_user.is_admin:
-        flash('No tienes permisos para acceder a esta página', 'error')
-        return redirect(url_for('main.index'))
-    
-    tasks = Task.query.all()
-    return render_template('tasks/manage.html', tasks=tasks)
-
-
-@bp.route('/create', methods=['POST'])
-@login_required
+@bp.route('/api', methods=['POST'])
 def create_task():
-    """Crear una nueva tarea (solo admins)"""
-    if not current_user.is_admin:
-        flash('No tienes permisos para crear tareas', 'error')
-        return redirect(url_for('main.index'))
+    """API para crear una nueva tarea"""
+    data = request.get_json()
     
-    name = request.form.get('name')
-    description = request.form.get('description', '')
+    # Validaciones
+    if not data.get('name'):
+        return jsonify({'error': 'El nombre es obligatorio'}), 400
     
-    if not name:
-        flash('El nombre de la tarea es obligatorio', 'error')
-        return redirect(url_for('tasks.manage_tasks'))
+    # Verificar si la tarea ya existe
+    existing = Task.query.filter_by(name=data['name']).first()
+    if existing:
+        return jsonify({'error': 'Ya existe una tarea con ese nombre'}), 400
     
+    # Crear tarea
     task = Task(
-        name=name,
-        description=description,
-        created_by=current_user.id
+        name=data['name'],
+        description=data.get('description', ''),
+        estimated_duration=data.get('estimated_duration'),
+        category=data.get('category', ''),
+        is_active=data.get('is_active', True)
     )
     
-    db.session.add(task)
-    db.session.commit()
-    
-    flash(f'Tarea "{name}" creada correctamente', 'success')
-    return redirect(url_for('tasks.manage_tasks'))
+    try:
+        db.session.add(task)
+        db.session.commit()
+        return jsonify({
+            'message': 'Tarea creada exitosamente',
+            'task': task.to_dict()
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 
-@bp.route('/toggle/<int:task_id>', methods=['POST'])
-@login_required
-def toggle_task(task_id):
-    """Activar/desactivar una tarea (solo admins)"""
-    if not current_user.is_admin:
-        return jsonify({'error': 'No autorizado'}), 403
-    
+@bp.route('/api/<int:task_id>', methods=['PUT'])
+def update_task(task_id):
+    """API para actualizar una tarea"""
     task = Task.query.get_or_404(task_id)
-    task.is_active = not task.is_active
+    data = request.get_json()
     
-    db.session.commit()
+    # Validaciones
+    if 'name' in data and data['name'] != task.name:
+        existing = Task.query.filter_by(name=data['name']).first()
+        if existing:
+            return jsonify({'error': 'Ya existe una tarea con ese nombre'}), 400
     
-    status = 'activada' if task.is_active else 'desactivada'
-    return jsonify({'success': True, 'message': f'Tarea {status}', 'is_active': task.is_active})
+    # Actualizar campos
+    if 'name' in data:
+        task.name = data['name']
+    if 'description' in data:
+        task.description = data['description']
+    if 'estimated_duration' in data:
+        task.estimated_duration = data['estimated_duration']
+    if 'category' in data:
+        task.category = data['category']
+    if 'is_active' in data:
+        task.is_active = data['is_active']
+    
+    try:
+        db.session.commit()
+        return jsonify({
+            'message': 'Tarea actualizada exitosamente',
+            'task': task.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 
-@bp.route('/delete/<int:task_id>', methods=['POST'])
-@login_required
+@bp.route('/api/<int:task_id>', methods=['DELETE'])
 def delete_task(task_id):
-    """Eliminar una tarea (solo admins)"""
-    if not current_user.is_admin:
-        flash('No tienes permisos para eliminar tareas', 'error')
-        return redirect(url_for('main.index'))
-    
+    """API para eliminar (desactivar) una tarea"""
     task = Task.query.get_or_404(task_id)
     
-    # Verificar si tiene asignaciones
-    if task.assignments.count() > 0:
-        flash('No se puede eliminar una tarea con historial de asignaciones', 'error')
-        return redirect(url_for('tasks.manage_tasks'))
+    # En lugar de eliminar, desactivamos
+    task.is_active = False
     
-    db.session.delete(task)
-    db.session.commit()
+    try:
+        db.session.commit()
+        return jsonify({'message': 'Tarea desactivada exitosamente'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/api/<int:task_id>/history')
+def task_history(task_id):
+    """API para obtener el historial de asignaciones de una tarea"""
+    task = Task.query.get_or_404(task_id)
     
-    flash('Tarea eliminada correctamente', 'success')
-    return redirect(url_for('tasks.manage_tasks'))
+    # Obtener todas las asignaciones de la tarea
+    assignments = task.assignments.order_by(
+        TaskAssignment.start_time.desc()
+    ).all()
+    
+    return jsonify({
+        'task': task.to_dict(),
+        'assignments': [assignment.to_dict() for assignment in assignments]
+    })

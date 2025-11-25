@@ -1,68 +1,58 @@
-from flask import Blueprint, render_template
-from flask_login import login_required, current_user
-from app.models import User, Task, TaskAssignment
+from flask import Blueprint, render_template, jsonify
+from app.models import Employee, Task, TaskAssignment
 from sqlalchemy import func
+from datetime import datetime, timedelta
 
 bp = Blueprint('main', __name__)
 
 
 @bp.route('/')
-@login_required
 def index():
-    """Vista principal - Dashboard del equipo"""
-    # Obtener todos los usuarios activos
-    users = User.query.filter_by(is_active=True).all()
-    
-    # Obtener tareas activas
-    active_tasks = Task.query.filter_by(is_active=True).all()
-    
-    # Preparar datos para el dashboard
-    team_status = []
-    for user in users:
-        current_task = user.get_current_task()
-        team_status.append({
-            'user': user,
-            'current_task': current_task
-        })
-    
-    return render_template('main/index.html', 
-                         team_status=team_status,
-                         active_tasks=active_tasks)
+    """Página principal - Dashboard"""
+    return render_template('index.html')
 
 
-@bp.route('/history')
-@login_required
-def history():
-    """Vista del historial de tareas"""
-    # Obtener historial completo ordenado por fecha
-    assignments = TaskAssignment.query.filter_by(completed=True)\
-        .order_by(TaskAssignment.completed_at.desc())\
-        .limit(100)\
-        .all()
-    
-    return render_template('main/history.html', assignments=assignments)
+@bp.route('/dashboard')
+def dashboard():
+    """Vista del dashboard con información general"""
+    return render_template('dashboard.html')
 
 
-@bp.route('/my-tasks')
-@login_required
-def my_tasks():
-    """Vista de mis tareas"""
-    # Tareas actuales del usuario
-    current_task = current_user.get_current_task()
+@bp.route('/api/dashboard/stats')
+def dashboard_stats():
+    """API para obtener estadísticas del dashboard"""
     
-    # Historial personal
-    my_history = TaskAssignment.query.filter_by(
-        user_id=current_user.id,
-        completed=True
-    ).order_by(TaskAssignment.completed_at.desc()).limit(20).all()
+    # Contar empleados activos
+    active_employees = Employee.query.filter_by(is_active=True).count()
     
-    # Estadísticas personales
-    total_completed = TaskAssignment.query.filter_by(
-        user_id=current_user.id,
-        completed=True
+    # Contar tareas disponibles
+    available_tasks = Task.query.filter_by(is_active=True).count()
+    
+    # Contar asignaciones en progreso
+    active_assignments = TaskAssignment.query.filter_by(status='en_progreso').count()
+    
+    # Asignaciones completadas hoy
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    completed_today = TaskAssignment.query.filter(
+        TaskAssignment.status == 'completada',
+        TaskAssignment.end_time >= today_start
     ).count()
     
-    return render_template('main/my_tasks.html',
-                         current_task=current_task,
-                         my_history=my_history,
-                         total_completed=total_completed)
+    return jsonify({
+        'active_employees': active_employees,
+        'available_tasks': available_tasks,
+        'active_assignments': active_assignments,
+        'completed_today': completed_today
+    })
+
+
+@bp.route('/api/current-assignments')
+def current_assignments():
+    """API para obtener las asignaciones actuales de todos los empleados"""
+    
+    # Obtener asignaciones en progreso
+    assignments = TaskAssignment.query.filter_by(status='en_progreso').all()
+    
+    return jsonify({
+        'assignments': [assignment.to_dict() for assignment in assignments]
+    })

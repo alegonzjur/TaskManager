@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Task Manager{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-chart-line"></i> Dashboard
+        </h2>
+    </div>
+</div>
+
+<!-- Estadísticas rápidas -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2">Empleados Activos</h6>
+                        <h2 class="card-title mb-0" id="stat-employees">-</h2>
+                    </div>
+                    <i class="fas fa-users fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2">Tareas Disponibles</h6>
+                        <h2 class="card-title mb-0" id="stat-tasks">-</h2>
+                    </div>
+                    <i class="fas fa-list-check fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2">En Progreso</h6>
+                        <h2 class="card-title mb-0" id="stat-active">-</h2>
+                    </div>
+                    <i class="fas fa-clock fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-subtitle mb-2">Completadas Hoy</h6>
+                        <h2 class="card-title mb-0" id="stat-completed">-</h2>
+                    </div>
+                    <i class="fas fa-check-circle fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Asignaciones actuales -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-tasks"></i> Asignaciones Actuales
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="current-assignments">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Cargar estadísticas
+async function loadStats() {
+    try {
+        const response = await axios.get('/api/dashboard/stats');
+        const stats = response.data;
+        
+        document.getElementById('stat-employees').textContent = stats.active_employees;
+        document.getElementById('stat-tasks').textContent = stats.available_tasks;
+        document.getElementById('stat-active').textContent = stats.active_assignments;
+        document.getElementById('stat-completed').textContent = stats.completed_today;
+        
+    } catch (error) {
+        console.error('Error al cargar estadísticas:', error);
+    }
+}
+
+// Cargar asignaciones actuales
+async function loadCurrentAssignments() {
+    try {
+        const response = await axios.get('/api/current-assignments');
+        const assignments = response.data.assignments;
+        
+        const container = document.getElementById('current-assignments');
+        
+        if (assignments.length === 0) {
+            container.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> 
+                    No hay asignaciones en progreso.
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '<div class="table-responsive"><table class="table table-hover">';
+        html += '<thead><tr>';
+        html += '<th>Empleado</th><th>Tarea</th><th>Inicio</th><th>Tiempo</th>';
+        html += '</tr></thead><tbody>';
+        
+        assignments.forEach(assignment => {
+            const startTime = new Date(assignment.start_time);
+            const elapsed = Math.floor((new Date() - startTime) / 60000);
+            
+            html += '<tr>';
+            html += `<td>${assignment.employee_name}</td>`;
+            html += `<td>${assignment.task_name}</td>`;
+            html += `<td>${startTime.toLocaleTimeString('es-ES')}</td>`;
+            html += `<td><span class="badge bg-info">${elapsed} min</span></td>`;
+            html += '</tr>';
+        });
+        
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+        
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+// Inicializar
+document.addEventListener('DOMContentLoaded', function() {
+    loadStats();
+    loadCurrentAssignments();
+    
+    // Actualizar cada 30 segundos
+    setInterval(() => {
+        loadStats();
+        loadCurrentAssignments();
+    }, 30000);
+});
+</script>
+{% endblock %}
