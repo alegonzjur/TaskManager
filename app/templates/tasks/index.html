@@ -177,6 +177,46 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <hr class="my-3">
+                    
+                    <!-- Sección de asignación de empleados -->
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="fas fa-users"></i> ¿Quién puede realizar esta tarea?
+                        </label>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="assignmentType" 
+                                   id="assign_all" value="all" checked onchange="toggleEmployeeSelection()">
+                            <label class="form-check-label" for="assign_all">
+                                <strong>Todos los empleados</strong>
+                                <small class="text-muted d-block">Cualquier empleado activo podrá iniciar esta tarea</small>
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="assignmentType" 
+                                   id="assign_specific" value="specific" onchange="toggleEmployeeSelection()">
+                            <label class="form-check-label" for="assign_specific">
+                                <strong>Empleados específicos</strong>
+                                <small class="text-muted d-block">Solo los empleados seleccionados verán esta tarea</small>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Lista de empleados (oculta por defecto) -->
+                    <div id="employeeSelectionContainer" class="mb-3" style="display: none;">
+                        <label class="form-label">Selecciona empleados:</label>
+                        <div class="border rounded p-3" style="max-height: 200px; overflow-y: auto;" id="employeeCheckboxes">
+                            <div class="text-center text-muted">
+                                <div class="spinner-border spinner-border-sm"></div>
+                                Cargando empleados...
+                            </div>
+                        </div>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle"></i> 
+                            Selecciona al menos un empleado
+                        </div>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -218,6 +258,7 @@
 // Variables globales
 let allTasks = [];
 let allCategories = [];
+let allEmployeesForTasks = [];
 let showInactive = false;
 let editingTaskId = null;
 
@@ -225,12 +266,62 @@ let editingTaskId = null;
 document.addEventListener('DOMContentLoaded', function() {
     loadTasks();
     loadCategories();
+    loadEmployeesForTasks();
     
     // Búsqueda en tiempo real
     document.getElementById('searchInput').addEventListener('input', function(e) {
         filterTasks();
     });
 });
+
+// Cargar empleados para asignación de tareas
+async function loadEmployeesForTasks() {
+    try {
+        const response = await axios.get('/employees/api?active_only=true');
+        allEmployeesForTasks = response.data.employees;
+    } catch (error) {
+        console.error('Error al cargar empleados:', error);
+    }
+}
+
+// Toggle entre todos/específicos
+function toggleEmployeeSelection() {
+    const assignSpecific = document.getElementById('assign_specific').checked;
+    const container = document.getElementById('employeeSelectionContainer');
+    
+    if (assignSpecific) {
+        container.style.display = 'block';
+        displayEmployeeCheckboxes();
+    } else {
+        container.style.display = 'none';
+    }
+}
+
+// Mostrar checkboxes de empleados
+function displayEmployeeCheckboxes() {
+    const container = document.getElementById('employeeCheckboxes');
+    
+    if (allEmployeesForTasks.length === 0) {
+        container.innerHTML = '<p class="text-muted small">No hay empleados activos disponibles</p>';
+        return;
+    }
+    
+    let html = '';
+    allEmployeesForTasks.forEach(emp => {
+        html += `
+            <div class="form-check mb-2">
+                <input class="form-check-input employee-checkbox" type="checkbox" 
+                       value="${emp.id}" id="emp_${emp.id}">
+                <label class="form-check-label" for="emp_${emp.id}">
+                    <strong>${emp.name}</strong>
+                    ${emp.position ? `<small class="text-muted">- ${emp.position}</small>` : ''}
+                </label>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
 
 // Cargar todas las tareas
 async function loadTasks() {
@@ -436,10 +527,17 @@ function openAddModal() {
     document.getElementById('taskForm').reset();
     document.getElementById('task_id').value = '';
     document.getElementById('is_active').value = 'true';
+    
+    // Resetear selección de empleados
+    document.getElementById('assign_all').checked = true;
+    document.getElementById('employeeSelectionContainer').style.display = 'none';
+    
+    // Desmarcar todos los checkboxes
+    document.querySelectorAll('.employee-checkbox').forEach(cb => cb.checked = false);
 }
 
 // Editar tarea
-function editTask(taskId) {
+async function editTask(taskId) {
     const task = allTasks.find(t => t.id === taskId);
     if (!task) return;
     
@@ -451,6 +549,31 @@ function editTask(taskId) {
     document.getElementById('category').value = task.category || '';
     document.getElementById('estimated_duration').value = task.estimated_duration || '';
     document.getElementById('is_active').value = task.is_active.toString();
+    
+    // Cargar información de empleados asignados
+    try {
+        const response = await axios.get(`/tasks/api/${taskId}`);
+        const taskDetail = response.data;
+        
+        if (taskDetail.assigned_to_all) {
+            document.getElementById('assign_all').checked = true;
+            document.getElementById('employeeSelectionContainer').style.display = 'none';
+        } else {
+            document.getElementById('assign_specific').checked = true;
+            document.getElementById('employeeSelectionContainer').style.display = 'block';
+            displayEmployeeCheckboxes();
+            
+            // Marcar empleados asignados
+            if (taskDetail.allowed_employee_ids) {
+                taskDetail.allowed_employee_ids.forEach(empId => {
+                    const checkbox = document.getElementById(`emp_${empId}`);
+                    if (checkbox) checkbox.checked = true;
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error al cargar detalles de tarea:', error);
+    }
     
     const modal = new bootstrap.Modal(document.getElementById('taskModal'));
     modal.show();
@@ -465,12 +588,28 @@ async function saveTask() {
         return;
     }
     
+    const assignedToAll = document.getElementById('assign_all').checked;
+    let employeeIds = [];
+    
+    // Si es para empleados específicos, recoger IDs
+    if (!assignedToAll) {
+        const checkedBoxes = document.querySelectorAll('.employee-checkbox:checked');
+        employeeIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value));
+        
+        if (employeeIds.length === 0) {
+            alert('Debes seleccionar al menos un empleado o marcar "Todos los empleados"');
+            return;
+        }
+    }
+    
     const data = {
         name: document.getElementById('name').value.trim(),
         description: document.getElementById('description').value.trim() || null,
         category: document.getElementById('category').value.trim() || null,
         estimated_duration: parseInt(document.getElementById('estimated_duration').value) || null,
-        is_active: document.getElementById('is_active').value === 'true'
+        is_active: document.getElementById('is_active').value === 'true',
+        assigned_to_all: assignedToAll,
+        employee_ids: employeeIds
     };
     
     try {

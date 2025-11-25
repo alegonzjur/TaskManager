@@ -394,17 +394,53 @@ function displayEmployeesControl() {
             // Mostrar tarea actual y temporizador
             html += '<div class="bg-white p-3 rounded mb-3">';
             html += `<h6 class="mb-2"><i class="fas fa-tasks"></i> ${assignment.task_name}</h6>`;
+            
+            // Mostrar estado de pausa si aplica
+            if (assignment.status === 'pausada') {
+                html += '<div class="alert alert-warning py-2 mb-2">';
+                html += '<i class="fas fa-pause-circle"></i> <strong>PAUSADA</strong>';
+                html += '</div>';
+            }
+            
             html += `<div class="timer-display text-primary" id="timer-${assignment.id}">00:00:00</div>`;
             html += `<small class="text-muted">Iniciado: ${formatTime(assignment.start_time)}</small>`;
+            
+            // Mostrar tiempo pausado si existe
+            if (assignment.total_paused_duration && assignment.total_paused_duration > 0) {
+                html += `<div class="small text-warning mt-1">
+                            <i class="fas fa-pause"></i> Tiempo pausado: ${assignment.total_paused_duration} min
+                         </div>`;
+            }
+            
             if (assignment.notes) {
                 html += `<p class="small mt-2 mb-0"><i class="fas fa-sticky-note"></i> ${assignment.notes}</p>`;
             }
             html += '</div>';
             
-            // Botón STOP
-            html += `<button class="btn btn-danger btn-lg w-100" onclick="openCompleteModal(${assignment.id})">
-                        <i class="fas fa-stop"></i> DETENER
-                     </button>`;
+            // Botones según estado
+            if (assignment.status === 'pausada') {
+                // Botón REANUDAR
+                html += `<button class="btn btn-warning btn-lg w-100 mb-2" onclick="resumeTask(${assignment.id})">
+                            <i class="fas fa-play"></i> REANUDAR
+                         </button>`;
+                html += `<button class="btn btn-danger w-100" onclick="openCompleteModal(${assignment.id})">
+                            <i class="fas fa-stop"></i> FINALIZAR
+                         </button>`;
+            } else {
+                // Botones PAUSAR y DETENER
+                html += `<div class="row g-2">`;
+                html += `<div class="col-6">
+                            <button class="btn btn-warning btn-lg w-100" onclick="pauseTask(${assignment.id})">
+                                <i class="fas fa-pause"></i> PAUSAR
+                            </button>
+                         </div>`;
+                html += `<div class="col-6">
+                            <button class="btn btn-danger btn-lg w-100" onclick="openCompleteModal(${assignment.id})">
+                                <i class="fas fa-stop"></i> DETENER
+                            </button>
+                         </div>`;
+                html += `</div>`;
+            }
         } else {
             // Botón START
             html += `<button class="btn btn-success btn-lg w-100" onclick="openStartModal(${employee.id}, '${employee.name}')">
@@ -416,7 +452,12 @@ function displayEmployeesControl() {
         
         // Inicializar temporizador si está trabajando
         if (isWorking) {
-            initTimer(assignment.id, assignment.start_time);
+            initTimer(
+                assignment.id, 
+                assignment.start_time, 
+                assignment.total_paused_duration || 0,
+                assignment.status
+            );
         }
     });
     
@@ -425,32 +466,53 @@ function displayEmployeesControl() {
 }
 
 // Inicializar temporizador
-function initTimer(assignmentId, startTime) {
+function initTimer(assignmentId, startTime, totalPausedMinutes = 0, status = 'en_progreso') {
     if (timers[assignmentId]) {
         clearInterval(timers[assignmentId]);
     }
     
     const updateTimer = () => {
-        const elapsed = Date.now() - new Date(startTime).getTime();
-        const hours = Math.floor(elapsed / 3600000);
-        const minutes = Math.floor((elapsed % 3600000) / 60000);
-        const seconds = Math.floor((elapsed % 60000) / 1000);
-        
         const timerElement = document.getElementById(`timer-${assignmentId}`);
-        if (timerElement) {
-            timerElement.textContent = 
-                `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        if (!timerElement) return;
+        
+        if (status === 'pausada') {
+            // Si está pausada, no actualizar el tiempo
+            timerElement.classList.add('text-warning');
+            timerElement.classList.remove('text-primary');
+            return;
         }
+        
+        timerElement.classList.add('text-primary');
+        timerElement.classList.remove('text-warning');
+        
+        const elapsed = Date.now() - new Date(startTime).getTime();
+        // Restar tiempo pausado (convertir minutos a milisegundos)
+        const adjustedElapsed = elapsed - (totalPausedMinutes * 60000);
+        
+        const hours = Math.floor(adjustedElapsed / 3600000);
+        const minutes = Math.floor((adjustedElapsed % 3600000) / 60000);
+        const seconds = Math.floor((adjustedElapsed % 60000) / 1000);
+        
+        timerElement.textContent = 
+            `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     };
     
     updateTimer(); // Actualizar inmediatamente
-    timers[assignmentId] = setInterval(updateTimer, 1000);
+    
+    if (status !== 'pausada') {
+        timers[assignmentId] = setInterval(updateTimer, 1000);
+    }
 }
 
 // Actualizar todos los temporizadores
 function updateAllTimers() {
     currentAssignments.forEach(assignment => {
-        initTimer(assignment.id, assignment.start_time);
+        initTimer(
+            assignment.id, 
+            assignment.start_time,
+            assignment.total_paused_duration || 0,
+            assignment.status
+        );
     });
 }
 
@@ -518,14 +580,29 @@ async function openStartModal(employeeId, employeeName) {
     document.getElementById('selected_employee_name').textContent = employeeName;
     document.getElementById('assignment_notes').value = '';
     
-    // Cargar tareas en el select
+    // Cargar tareas disponibles para este empleado específico
     const taskSelect = document.getElementById('task_select');
-    taskSelect.innerHTML = '<option value="">Selecciona una tarea...</option>';
+    taskSelect.innerHTML = '<option value="">Cargando tareas disponibles...</option>';
     
-    allTasks.forEach(task => {
-        const duration = task.estimated_duration ? ` (${task.estimated_duration} min)` : '';
-        taskSelect.innerHTML += `<option value="${task.id}">${task.name}${duration}</option>`;
-    });
+    try {
+        const response = await axios.get(`/tasks/api/available-for/${employeeId}`);
+        const availableTasks = response.data.tasks;
+        
+        taskSelect.innerHTML = '<option value="">Selecciona una tarea...</option>';
+        
+        if (availableTasks.length === 0) {
+            taskSelect.innerHTML = '<option value="">No hay tareas disponibles para este empleado</option>';
+        } else {
+            availableTasks.forEach(task => {
+                const duration = task.estimated_duration ? ` (${task.estimated_duration} min)` : '';
+                const category = task.category ? ` [${task.category}]` : '';
+                taskSelect.innerHTML += `<option value="${task.id}">${task.name}${category}${duration}</option>`;
+            });
+        }
+    } catch (error) {
+        console.error('Error al cargar tareas:', error);
+        taskSelect.innerHTML = '<option value="">Error al cargar tareas</option>';
+    }
     
     const modal = new bootstrap.Modal(document.getElementById('startTaskModal'));
     modal.show();
@@ -580,6 +657,31 @@ function openCompleteModal(assignmentId) {
     
     const modal = new bootstrap.Modal(document.getElementById('completeTaskModal'));
     modal.show();
+}
+
+// Pausar tarea
+async function pauseTask(assignmentId) {
+    if (!confirm('¿Deseas pausar esta tarea?')) return;
+    
+    try {
+        await axios.put(`/assignments/api/${assignmentId}/pause`);
+        showSuccess('Tarea pausada. Puedes reanudarla cuando quieras.');
+        await loadAll();
+    } catch (error) {
+        showError('Error al pausar tarea');
+    }
+}
+
+// Reanudar tarea
+async function resumeTask(assignmentId) {
+    try {
+        await axios.put(`/assignments/api/${assignmentId}/resume`);
+        showSuccess('¡Tarea reanudada! El temporizador continúa.');
+        await loadAll();
+    } catch (error) {
+        const message = error.response?.data?.error || 'Error al reanudar tarea';
+        showError(message);
+    }
 }
 
 // Completar tarea

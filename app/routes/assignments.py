@@ -154,6 +154,8 @@ def pause_assignment(assignment_id):
     
     data = request.get_json() or {}
     
+    # Guardar el momento de la pausa
+    assignment.pause_time = datetime.utcnow()
     assignment.status = 'pausada'
     
     if 'notes' in data:
@@ -191,13 +193,23 @@ def resume_assignment(assignment_id):
             'active_assignment': active_assignment.to_dict()
         }), 400
     
+    # Calcular tiempo que estuvo pausada
+    if assignment.pause_time:
+        pause_duration = datetime.utcnow() - assignment.pause_time
+        pause_minutes = int(pause_duration.total_seconds() / 60)
+        
+        # Acumular al tiempo total pausado
+        assignment.total_paused_duration = (assignment.total_paused_duration or 0) + pause_minutes
+    
     assignment.status = 'en_progreso'
+    assignment.pause_time = None  # Limpiar tiempo de pausa
     
     try:
         db.session.commit()
         return jsonify({
             'message': 'Tarea reanudada exitosamente',
-            'assignment': assignment.to_dict()
+            'assignment': assignment.to_dict(),
+            'total_paused_minutes': assignment.total_paused_duration
         })
     except Exception as e:
         db.session.rollback()
