@@ -471,6 +471,19 @@ function initTimer(assignmentId, startTime, totalPausedMinutes = 0, status = 'en
         clearInterval(timers[assignmentId]);
     }
     
+    // Asegurar que totalPausedMinutes sea un número válido
+    totalPausedMinutes = parseInt(totalPausedMinutes) || 0;
+    
+    // DEBUG: Ver valores recibidos
+    console.log('InitTimer called:', {
+        assignmentId,
+        startTime,
+        startTimeDate: new Date(startTime),
+        totalPausedMinutes,
+        status,
+        now: new Date()
+    });
+    
     const updateTimer = () => {
         const timerElement = document.getElementById(`timer-${assignmentId}`);
         if (!timerElement) return;
@@ -485,13 +498,31 @@ function initTimer(assignmentId, startTime, totalPausedMinutes = 0, status = 'en
         timerElement.classList.add('text-primary');
         timerElement.classList.remove('text-warning');
         
-        const elapsed = Date.now() - new Date(startTime).getTime();
-        // Restar tiempo pausado (convertir minutos a milisegundos)
-        const adjustedElapsed = elapsed - (totalPausedMinutes * 60000);
+        // Calcular tiempo transcurrido
+        const startDate = new Date(startTime);
+        const now = new Date();
+        const elapsed = now.getTime() - startDate.getTime();
         
+        // Restar tiempo pausado (convertir minutos a milisegundos)
+        const pausedMs = totalPausedMinutes * 60000;
+        const adjustedElapsed = Math.max(0, elapsed - pausedMs); // Asegurar que no sea negativo
+        
+        // Calcular horas, minutos y segundos
         const hours = Math.floor(adjustedElapsed / 3600000);
         const minutes = Math.floor((adjustedElapsed % 3600000) / 60000);
         const seconds = Math.floor((adjustedElapsed % 60000) / 1000);
+        
+        // DEBUG: Primera vez que se ejecuta
+        if (!timerElement.dataset.initialized) {
+            console.log('Timer calculation:', {
+                assignmentId,
+                elapsed: elapsed / 1000 + 's',
+                pausedMs: pausedMs / 1000 + 's',
+                adjustedElapsed: adjustedElapsed / 1000 + 's',
+                hours, minutes, seconds
+            });
+            timerElement.dataset.initialized = 'true';
+        }
         
         timerElement.textContent = 
             `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;

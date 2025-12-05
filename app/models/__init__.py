@@ -34,13 +34,20 @@ class Employee(db.Model):
     
     def to_dict(self):
         """Convierte el objeto a diccionario"""
+        def to_iso_utc(dt):
+            if dt is None:
+                return None
+            if dt.tzinfo is None:
+                return dt.isoformat() + 'Z'
+            return dt.isoformat()
+        
         return {
             'id': self.id,
             'name': self.name,
             'email': self.email,
             'position': self.position,
             'is_active': self.is_active,
-            'created_at': self.created_at.isoformat() if self.created_at else None
+            'created_at': to_iso_utc(self.created_at)
         }
 
 
@@ -70,6 +77,13 @@ class Task(db.Model):
     
     def to_dict(self, include_employees=False):
         """Convierte el objeto a diccionario"""
+        def to_iso_utc(dt):
+            if dt is None:
+                return None
+            if dt.tzinfo is None:
+                return dt.isoformat() + 'Z'
+            return dt.isoformat()
+        
         data = {
             'id': self.id,
             'name': self.name,
@@ -78,7 +92,7 @@ class Task(db.Model):
             'category': self.category,
             'is_active': self.is_active,
             'assigned_to_all': self.assigned_to_all,
-            'created_at': self.created_at.isoformat() if self.created_at else None
+            'created_at': to_iso_utc(self.created_at)
         }
         
         if include_employees:
@@ -125,20 +139,29 @@ class TaskAssignment(db.Model):
     
     def to_dict(self):
         """Convierte el objeto a diccionario"""
+        # Función auxiliar para convertir datetime a ISO con 'Z' (UTC)
+        def to_iso_utc(dt):
+            if dt is None:
+                return None
+            # Si no tiene timezone, asumimos que es UTC
+            if dt.tzinfo is None:
+                return dt.isoformat() + 'Z'
+            return dt.isoformat()
+        
         return {
             'id': self.id,
             'employee_id': self.employee_id,
             'employee_name': self.employee.name if self.employee else None,
             'task_id': self.task_id,
             'task_name': self.task.name if self.task else None,
-            'start_time': self.start_time.isoformat() if self.start_time else None,
-            'end_time': self.end_time.isoformat() if self.end_time else None,
-            'pause_time': self.pause_time.isoformat() if self.pause_time else None,
-            'total_paused_duration': self.total_paused_duration,
+            'start_time': to_iso_utc(self.start_time),
+            'end_time': to_iso_utc(self.end_time),
+            'pause_time': to_iso_utc(self.pause_time),
+            'total_paused_duration': self.total_paused_duration or 0,
             'status': self.status,
             'notes': self.notes,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            'created_at': to_iso_utc(self.created_at),
+            'updated_at': to_iso_utc(self.updated_at)
         }
     
     def get_duration_minutes(self):
