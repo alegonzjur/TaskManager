@@ -1,5 +1,6 @@
 from datetime import datetime
 from app import db
+from werkzeug.security import generate_password_hash, check_password_hash
 
 
 # Tabla intermedia para tareas asignables a empleados específicos
@@ -11,15 +12,24 @@ task_allowed_employees = db.Table('task_allowed_employees',
 
 
 class Employee(db.Model):
-    """Modelo para empleados"""
+    """Modelo para empleados con autenticación"""
     __tablename__ = 'employees'
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     position = db.Column(db.String(100))
+    
+    # Campos de autenticación
+    password_hash = db.Column(db.String(255))
+    birth_date = db.Column(db.Date)  # Fecha de nacimiento
+    role = db.Column(db.String(20), default='employee')  # 'admin' o 'employee'
+    
+    # Estado y metadata
     is_active = db.Column(db.Boolean, default=True)
+    last_login = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relación con asignaciones de tareas
     task_assignments = db.relationship('TaskAssignment', backref='employee', 
@@ -32,7 +42,33 @@ class Employee(db.Model):
     def __repr__(self):
         return f'<Employee {self.name}>'
     
-    def to_dict(self):
+    def set_password(self, password):
+        """Establece la contraseña hasheada"""
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """Verifica la contraseña"""
+        if not self.password_hash:
+            return False
+        return check_password_hash(self.password_hash, password)
+    
+    def is_admin(self):
+        """Verifica si el usuario es administrador"""
+        return self.role == 'admin'
+    
+    # Métodos requeridos por Flask-Login
+    @property
+    def is_authenticated(self):
+        return True
+    
+    @property
+    def is_anonymous(self):
+        return False
+    
+    def get_id(self):
+        return str(self.id)
+    
+    def to_dict(self, include_sensitive=False):
         """Convierte el objeto a diccionario"""
         def to_iso_utc(dt):
             if dt is None:
@@ -41,14 +77,22 @@ class Employee(db.Model):
                 return dt.isoformat() + 'Z'
             return dt.isoformat()
         
-        return {
+        data = {
             'id': self.id,
             'name': self.name,
             'email': self.email,
             'position': self.position,
             'is_active': self.is_active,
+            'role': self.role,
             'created_at': to_iso_utc(self.created_at)
         }
+        
+        if include_sensitive:
+            data['birth_date'] = self.birth_date.isoformat() if self.birth_date else None
+            data['last_login'] = to_iso_utc(self.last_login)
+            data['has_password'] = bool(self.password_hash)
+        
+        return data
 
 
 class Task(db.Model):

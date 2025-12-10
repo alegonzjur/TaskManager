@@ -85,7 +85,7 @@
 
 <!-- Modal para añadir/editar empleado -->
 <div class="modal fade" id="employeeModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="modalTitle">
@@ -96,6 +96,16 @@
             <div class="modal-body">
                 <form id="employeeForm">
                     <input type="hidden" id="employee_id">
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        <strong>Registro de Usuario:</strong> Se creará una cuenta de acceso para este empleado.
+                    </div>
+                    
+                    <!-- Información Personal -->
+                    <h6 class="text-primary mb-3">
+                        <i class="fas fa-user"></i> Información Personal
+                    </h6>
                     
                     <div class="row">
                         <div class="col-md-6">
@@ -111,12 +121,11 @@
                         
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="email" class="form-label">
-                                    <i class="fas fa-envelope"></i> Email Corporativo *
+                                <label for="birth_date" class="form-label">
+                                    <i class="fas fa-calendar"></i> Fecha de Nacimiento
                                 </label>
-                                <input type="email" class="form-control" id="email" required 
-                                       placeholder="ana.garcia@empresa.com">
-                                <div class="form-text">Email único para identificación y futuro login</div>
+                                <input type="date" class="form-control" id="birth_date">
+                                <div class="form-text">Para verificación de identidad (opcional)</div>
                             </div>
                         </div>
                     </div>
@@ -133,7 +142,20 @@
                             </div>
                         </div>
                         
-                        <div class="col-md-6">
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label for="role" class="form-label">
+                                    <i class="fas fa-user-tag"></i> Rol
+                                </label>
+                                <select class="form-select" id="role">
+                                    <option value="employee" selected>Empleado</option>
+                                    <option value="admin">Administrador</option>
+                                </select>
+                                <div class="form-text">Permisos en el sistema</div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
                             <div class="mb-3">
                                 <label for="is_active" class="form-label">
                                     <i class="fas fa-toggle-on"></i> Estado
@@ -142,42 +164,73 @@
                                     <option value="true" selected>Activo</option>
                                     <option value="false">Inactivo</option>
                                 </select>
-                                <div class="form-text">Los empleados inactivos no pueden ser asignados</div>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Campos preparados para futuras funcionalidades -->
-                    <div class="collapse" id="advancedFields">
-                        <hr>
-                        <h6 class="text-muted"><i class="fas fa-cog"></i> Campos Avanzados (Próximamente)</h6>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">
-                                        <i class="fas fa-phone"></i> Teléfono
-                                    </label>
-                                    <input type="tel" class="form-control" disabled 
-                                           placeholder="+34 600 000 000">
-                                </div>
+                    <hr class="my-4">
+                    
+                    <!-- Credenciales de Acceso -->
+                    <h6 class="text-primary mb-3">
+                        <i class="fas fa-key"></i> Credenciales de Acceso
+                    </h6>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">
+                                    <i class="fas fa-envelope"></i> Email Corporativo *
+                                </label>
+                                <input type="email" class="form-control" id="email" required 
+                                       placeholder="ana.garcia@empresa.com">
+                                <div class="form-text">Email único para login</div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">
-                                        <i class="fas fa-building"></i> Departamento
-                                    </label>
-                                    <input type="text" class="form-control" disabled 
-                                           placeholder="Ej: Desarrollo">
-                                </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="email_confirm" class="form-label">
+                                    <i class="fas fa-envelope-circle-check"></i> Confirmar Email *
+                                </label>
+                                <input type="email" class="form-control" id="email_confirm" required 
+                                       placeholder="ana.garcia@empresa.com">
+                                <div class="form-text">Verifica que el email sea correcto</div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="text-end">
-                        <a class="btn btn-sm btn-link" data-bs-toggle="collapse" href="#advancedFields">
-                            <i class="fas fa-chevron-down"></i> Campos adicionales
-                        </a>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="password" class="form-label">
+                                    <i class="fas fa-lock"></i> Contraseña
+                                </label>
+                                <input type="password" class="form-control" id="password" 
+                                       placeholder="Mínimo 8 caracteres" minlength="8">
+                                <div class="form-text">Mínimo 8 caracteres (déjalo vacío para crear sin acceso)</div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="password_confirm" class="form-label">
+                                    <i class="fas fa-lock-open"></i> Confirmar Contraseña
+                                </label>
+                                <input type="password" class="form-control" id="password_confirm" 
+                                       placeholder="Repite la contraseña" minlength="8">
+                                <div class="form-text">Debe coincidir con la contraseña</div>
+                            </div>
+                        </div>
                     </div>
+                    
+                    <div id="password-strength" class="mb-3" style="display: none;">
+                        <small class="text-muted">Fortaleza: </small>
+                        <div class="progress" style="height: 5px;">
+                            <div id="password-strength-bar" class="progress-bar" role="progressbar" 
+                                 style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
                 </form>
             </div>
             <div class="modal-footer">
@@ -185,7 +238,7 @@
                     <i class="fas fa-times"></i> Cancelar
                 </button>
                 <button type="button" class="btn btn-primary" onclick="saveEmployee()">
-                    <i class="fas fa-save"></i> Guardar
+                    <i class="fas fa-save"></i> Crear Usuario
                 </button>
             </div>
         </div>
@@ -215,324 +268,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-// Variables globales
-let allEmployees = [];
-let showInactive = false;
-let editingEmployeeId = null;
-
-// Cargar empleados al iniciar
-document.addEventListener('DOMContentLoaded', function() {
-    loadEmployees();
-    
-    // Búsqueda en tiempo real
-    document.getElementById('searchInput').addEventListener('input', function(e) {
-        filterEmployees(e.target.value);
-    });
-});
-
-// Cargar todos los empleados
-async function loadEmployees() {
-    try {
-        const response = await axios.get('/employees/api');
-        allEmployees = response.data.employees;
-        updateStats();
-        displayEmployees();
-    } catch (error) {
-        console.error('Error al cargar empleados:', error);
-        showError('Error al cargar la lista de empleados');
-    }
-}
-
-// Actualizar estadísticas
-function updateStats() {
-    const total = allEmployees.length;
-    const active = allEmployees.filter(e => e.is_active).length;
-    const inactive = total - active;
-    
-    document.getElementById('stat-total').textContent = total;
-    document.getElementById('stat-active').textContent = active;
-    document.getElementById('stat-inactive').textContent = inactive;
-    
-    // Obtener empleados trabajando (esto requeriría una llamada adicional a la API)
-    loadWorkingEmployees();
-}
-
-// Obtener empleados trabajando actualmente
-async function loadWorkingEmployees() {
-    try {
-        const response = await axios.get('/assignments/api/current');
-        const workingCount = new Set(response.data.assignments.map(a => a.employee_id)).size;
-        document.getElementById('stat-working').textContent = workingCount;
-    } catch (error) {
-        document.getElementById('stat-working').textContent = '0';
-    }
-}
-
-// Mostrar empleados
-function displayEmployees() {
-    const container = document.getElementById('employees-container');
-    
-    // Filtrar según estado
-    let employees = showInactive ? allEmployees : allEmployees.filter(e => e.is_active);
-    
-    if (employees.length === 0) {
-        container.innerHTML = `
-            <div class="alert alert-info">
-                <i class="fas fa-info-circle"></i> 
-                No hay empleados ${showInactive ? '' : 'activos'} registrados.
-                <button class="btn btn-sm btn-primary ms-2" data-bs-toggle="modal" 
-                        data-bs-target="#employeeModal" onclick="openAddModal()">
-                    <i class="fas fa-plus"></i> Añadir Primero
-                </button>
-            </div>
-        `;
-        return;
-    }
-    
-    let html = '<div class="table-responsive"><table class="table table-hover align-middle">';
-    html += '<thead class="table-light">';
-    html += '<tr>';
-    html += '<th width="5%"><i class="fas fa-hashtag"></i></th>';
-    html += '<th width="25%"><i class="fas fa-user"></i> Nombre</th>';
-    html += '<th width="25%"><i class="fas fa-envelope"></i> Email</th>';
-    html += '<th width="20%"><i class="fas fa-briefcase"></i> Puesto</th>';
-    html += '<th width="10%"><i class="fas fa-circle-check"></i> Estado</th>';
-    html += '<th width="15%" class="text-center"><i class="fas fa-cog"></i> Acciones</th>';
-    html += '</tr>';
-    html += '</thead><tbody>';
-    
-    employees.forEach((emp, index) => {
-        const statusBadge = emp.is_active 
-            ? '<span class="badge bg-success"><i class="fas fa-check"></i> Activo</span>'
-            : '<span class="badge bg-secondary"><i class="fas fa-ban"></i> Inactivo</span>';
-        
-        const rowClass = emp.is_active ? '' : 'table-secondary';
-        
-        html += `<tr class="${rowClass}">`;
-        html += `<td class="text-muted">${index + 1}</td>`;
-        html += `<td><strong>${emp.name}</strong></td>`;
-        html += `<td><small>${emp.email}</small></td>`;
-        html += `<td>${emp.position || '<span class="text-muted">-</span>'}</td>`;
-        html += `<td>${statusBadge}</td>`;
-        html += `<td class="text-center">`;
-        html += `<div class="btn-group btn-group-sm" role="group">`;
-        html += `<button class="btn btn-outline-info" onclick="viewHistory(${emp.id})" title="Ver historial">
-                    <i class="fas fa-history"></i>
-                 </button>`;
-        html += `<button class="btn btn-outline-primary" onclick="editEmployee(${emp.id})" title="Editar">
-                    <i class="fas fa-edit"></i>
-                 </button>`;
-        
-        if (emp.is_active) {
-            html += `<button class="btn btn-outline-warning" onclick="confirmToggleStatus(${emp.id}, false)" title="Desactivar">
-                        <i class="fas fa-toggle-off"></i>
-                     </button>`;
-        } else {
-            html += `<button class="btn btn-outline-success" onclick="confirmToggleStatus(${emp.id}, true)" title="Activar">
-                        <i class="fas fa-toggle-on"></i>
-                     </button>`;
-        }
-        
-        html += `</div></td>`;
-        html += '</tr>';
-    });
-    
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
-}
-
-// Filtrar empleados por búsqueda
-function filterEmployees(searchTerm) {
-    const container = document.getElementById('employees-container');
-    searchTerm = searchTerm.toLowerCase().trim();
-    
-    if (searchTerm === '') {
-        displayEmployees();
-        return;
-    }
-    
-    let employees = showInactive ? allEmployees : allEmployees.filter(e => e.is_active);
-    employees = employees.filter(emp => 
-        emp.name.toLowerCase().includes(searchTerm) ||
-        emp.email.toLowerCase().includes(searchTerm) ||
-        (emp.position && emp.position.toLowerCase().includes(searchTerm))
-    );
-    
-    if (employees.length === 0) {
-        container.innerHTML = `
-            <div class="alert alert-warning">
-                <i class="fas fa-search"></i> 
-                No se encontraron empleados que coincidan con "${searchTerm}"
-            </div>
-        `;
-        return;
-    }
-    
-    // Mostrar resultados de búsqueda (reutilizar lógica de display)
-    let html = '<div class="table-responsive"><table class="table table-hover align-middle">';
-    html += '<thead class="table-light">';
-    html += '<tr><th>Nombre</th><th>Email</th><th>Puesto</th><th>Estado</th><th class="text-center">Acciones</th></tr>';
-    html += '</thead><tbody>';
-    
-    employees.forEach(emp => {
-        const statusBadge = emp.is_active 
-            ? '<span class="badge bg-success">Activo</span>'
-            : '<span class="badge bg-secondary">Inactivo</span>';
-        
-        html += `<tr>`;
-        html += `<td><strong>${emp.name}</strong></td>`;
-        html += `<td><small>${emp.email}</small></td>`;
-        html += `<td>${emp.position || '-'}</td>`;
-        html += `<td>${statusBadge}</td>`;
-        html += `<td class="text-center">`;
-        html += `<div class="btn-group btn-group-sm">`;
-        html += `<button class="btn btn-outline-info" onclick="viewHistory(${emp.id})"><i class="fas fa-history"></i></button>`;
-        html += `<button class="btn btn-outline-primary" onclick="editEmployee(${emp.id})"><i class="fas fa-edit"></i></button>`;
-        html += `<button class="btn btn-outline-warning" onclick="confirmToggleStatus(${emp.id}, ${!emp.is_active})">
-                    <i class="fas fa-toggle-${emp.is_active ? 'off' : 'on'}"></i>
-                 </button>`;
-        html += `</div></td></tr>`;
-    });
-    
-    html += '</tbody></table></div>';
-    container.innerHTML = html;
-}
-
-// Toggle mostrar inactivos
-function toggleShowInactive() {
-    showInactive = !showInactive;
-    document.getElementById('toggleText').textContent = showInactive ? 'Ocultar Inactivos' : 'Mostrar Inactivos';
-    document.getElementById('toggleIcon').className = showInactive ? 'fas fa-eye-slash' : 'fas fa-eye';
-    displayEmployees();
-}
-
-// Abrir modal para añadir
-function openAddModal() {
-    editingEmployeeId = null;
-    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-user-plus"></i> Nuevo Empleado';
-    document.getElementById('employeeForm').reset();
-    document.getElementById('employee_id').value = '';
-    document.getElementById('is_active').value = 'true';
-}
-
-// Editar empleado
-function editEmployee(employeeId) {
-    const employee = allEmployees.find(e => e.id === employeeId);
-    if (!employee) return;
-    
-    editingEmployeeId = employeeId;
-    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-user-edit"></i> Editar Empleado';
-    document.getElementById('employee_id').value = employee.id;
-    document.getElementById('name').value = employee.name;
-    document.getElementById('email').value = employee.email;
-    document.getElementById('position').value = employee.position || '';
-    document.getElementById('is_active').value = employee.is_active.toString();
-    
-    const modal = new bootstrap.Modal(document.getElementById('employeeModal'));
-    modal.show();
-}
-
-// Guardar empleado (crear o actualizar)
-async function saveEmployee() {
-    const form = document.getElementById('employeeForm');
-    
-    if (!form.checkValidity()) {
-        form.reportValidity();
-        return;
-    }
-    
-    const data = {
-        name: document.getElementById('name').value.trim(),
-        email: document.getElementById('email').value.trim(),
-        position: document.getElementById('position').value.trim(),
-        is_active: document.getElementById('is_active').value === 'true'
-    };
-    
-    try {
-        if (editingEmployeeId) {
-            // Actualizar
-            await axios.put(`/employees/api/${editingEmployeeId}`, data);
-            showSuccess('Empleado actualizado correctamente');
-        } else {
-            // Crear
-            await axios.post('/employees/api', data);
-            showSuccess('Empleado creado correctamente');
-        }
-        
-        // Cerrar modal y recargar
-        bootstrap.Modal.getInstance(document.getElementById('employeeModal')).hide();
-        await loadEmployees();
-        
-    } catch (error) {
-        const message = error.response?.data?.error || 'Error desconocido';
-        showError('Error al guardar: ' + message);
-    }
-}
-
-// Confirmar cambio de estado
-function confirmToggleStatus(employeeId, newStatus) {
-    const employee = allEmployees.find(e => e.id === employeeId);
-    const action = newStatus ? 'activar' : 'desactivar';
-    
-    document.getElementById('confirmMessage').innerHTML = `
-        ¿Estás seguro de que deseas <strong>${action}</strong> a <strong>${employee.name}</strong>?
-        ${!newStatus ? '<br><small class="text-muted">Los empleados inactivos no pueden ser asignados a tareas.</small>' : ''}
-    `;
-    
-    document.getElementById('confirmButton').onclick = () => toggleEmployeeStatus(employeeId, newStatus);
-    
-    const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
-    modal.show();
-}
-
-// Cambiar estado del empleado
-async function toggleEmployeeStatus(employeeId, newStatus) {
-    try {
-        await axios.put(`/employees/api/${employeeId}`, { is_active: newStatus });
-        showSuccess(`Empleado ${newStatus ? 'activado' : 'desactivado'} correctamente`);
-        bootstrap.Modal.getInstance(document.getElementById('confirmModal')).hide();
-        await loadEmployees();
-    } catch (error) {
-        showError('Error al cambiar el estado del empleado');
-    }
-}
-
-// Ver historial del empleado
-function viewHistory(employeeId) {
-    const employee = allEmployees.find(e => e.id === employeeId);
-    // Por ahora, mostrar alerta - luego se puede crear una página dedicada
-    alert(`Ver historial de ${employee.name}\n\nPróximamente: página de historial completo con todas las tareas asignadas.`);
-    
-    // Para implementar más tarde:
-    // window.location.href = `/employees/${employeeId}/history`;
-}
-
-// Funciones de utilidad para mostrar mensajes
-function showSuccess(message) {
-    const alert = document.createElement('div');
-    alert.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 end-0 m-3';
-    alert.style.zIndex = '9999';
-    alert.innerHTML = `
-        <i class="fas fa-check-circle"></i> ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-    document.body.appendChild(alert);
-    
-    setTimeout(() => alert.remove(), 3000);
-}
-
-function showError(message) {
-    const alert = document.createElement('div');
-    alert.className = 'alert alert-danger alert-dismissible fade show position-fixed top-0 end-0 m-3';
-    alert.style.zIndex = '9999';
-    alert.innerHTML = `
-        <i class="fas fa-exclamation-triangle"></i> ${message}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    `;
-    document.body.appendChild(alert);
-    
-    setTimeout(() => alert.remove(), 5000);
-}
-</script>
+<script src="{{ url_for('static', filename='js/employees.js') }}"></script>
 {% endblock %}

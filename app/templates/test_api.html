@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Test API Empleados</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test API Empleados</h1>
+    
+    <button onclick="testAPI()">Probar /employees/api</button>
+    <button onclick="testWithFetch()">Probar con Fetch</button>
+    
+    <div id="result"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        console.log('Axios cargado:', typeof axios !== 'undefined');
+        
+        async function testAPI() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>⏳ Cargando...</p>';
+            
+            try {
+                console.log('Llamando a /employees/api...');
+                const response = await axios.get('/employees/api');
+                console.log('Respuesta:', response.data);
+                
+                resultDiv.innerHTML = `
+                    <h3 class="success">✅ Éxito!</h3>
+                    <p>Total empleados: ${response.data.employees.length}</p>
+                    <pre>${JSON.stringify(response.data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.innerHTML = `
+                    <h3 class="error">❌ Error</h3>
+                    <p>${error.message}</p>
+                    <pre>${JSON.stringify(error.response?.data || error, null, 2)}</pre>
+                `;
+            }
+        }
+        
+        async function testWithFetch() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>⏳ Cargando con Fetch...</p>';
+            
+            try {
+                const response = await fetch('/employees/api');
+                const data = await response.json();
+                console.log('Respuesta con fetch:', data);
+                
+                resultDiv.innerHTML = `
+                    <h3 class="success">✅ Éxito con Fetch!</h3>
+                    <p>Total empleados: ${data.employees.length}</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                console.error('Error:', error);
+                resultDiv.innerHTML = `
+                    <h3 class="error">❌ Error</h3>
+                    <p>${error.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

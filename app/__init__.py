@@ -2,10 +2,12 @@ import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from flask_login import LoginManager
 
 # Inicializar extensiones
 db = SQLAlchemy()
 migrate = Migrate()
+login_manager = LoginManager()
 
 
 def create_app(config_name=None):
@@ -29,13 +31,25 @@ def create_app(config_name=None):
     # Inicializar extensiones con la app
     db.init_app(app)
     migrate.init_app(app, db)
+    login_manager.init_app(app)
+    
+    # Configurar Flask-Login
+    login_manager.login_view = 'auth.login'
+    login_manager.login_message = 'Por favor inicia sesión para acceder a esta página.'
+    login_manager.login_message_category = 'warning'
+    
+    @login_manager.user_loader
+    def load_user(user_id):
+        from app.models import Employee
+        return Employee.query.get(int(user_id))
     
     # Importar modelos
     from app.models import Employee, Task, TaskAssignment
     
     # Registrar blueprints
-    from app.routes import main, employees, tasks, assignments
+    from app.routes import main, employees, tasks, assignments, auth
     
+    app.register_blueprint(auth.bp)
     app.register_blueprint(main.bp)
     app.register_blueprint(employees.bp)
     app.register_blueprint(tasks.bp)

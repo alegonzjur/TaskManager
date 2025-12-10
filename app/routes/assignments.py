@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify
+from flask_login import login_required, current_user
 from app import db
 from app.models import TaskAssignment, Employee, Task
 from datetime import datetime
@@ -8,12 +9,14 @@ bp = Blueprint('assignments', __name__, url_prefix='/assignments')
 
 
 @bp.route('/')
+@login_required
 def index():
     """Vista de asignaciones"""
     return render_template('assignments/index.html')
 
 
 @bp.route('/api')
+@login_required
 def get_assignments():
     """API para obtener asignaciones con filtros opcionales"""
     employee_id = request.args.get('employee_id', type=int)

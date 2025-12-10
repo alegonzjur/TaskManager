@@ -1,17 +1,21 @@
 from flask import Blueprint, render_template, request, jsonify
+from flask_login import login_required, current_user
 from app import db
 from app.models import Task, TaskAssignment, Employee
+from app.decorators import admin_required
 
 bp = Blueprint('tasks', __name__, url_prefix='/tasks')
 
 
 @bp.route('/')
+@login_required
 def index():
     """Lista de tareas"""
     return render_template('tasks/index.html')
 
 
 @bp.route('/api')
+@login_required
 def get_tasks():
     """API para obtener todas las tareas"""
     active_only = request.args.get('active_only', 'false').lower() == 'true'

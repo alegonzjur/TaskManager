@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, jsonify
+from flask_login import login_required
 from app.models import Employee, Task, TaskAssignment
 from sqlalchemy import func
 from datetime import datetime, timedelta
@@ -7,15 +8,24 @@ bp = Blueprint('main', __name__)
 
 
 @bp.route('/')
+@login_required
 def index():
     """Página principal - Dashboard"""
     return render_template('index.html')
 
 
 @bp.route('/dashboard')
+@login_required
 def dashboard():
     """Vista del dashboard con información general"""
     return render_template('dashboard.html')
+
+
+@bp.route('/test-api')
+@login_required
+def test_api():
+    """Página de prueba de API"""
+    return render_template('test_api.html')
 
 
 @bp.route('/api/dashboard/stats')
