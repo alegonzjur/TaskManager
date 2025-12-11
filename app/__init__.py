@@ -47,13 +47,14 @@ def create_app(config_name=None):
     from app.models import Employee, Task, TaskAssignment
     
     # Registrar blueprints
-    from app.routes import main, employees, tasks, assignments, auth
+    from app.routes import main, employees, tasks, assignments, auth, attendance
     
     app.register_blueprint(auth.bp)
     app.register_blueprint(main.bp)
     app.register_blueprint(employees.bp)
     app.register_blueprint(tasks.bp)
     app.register_blueprint(assignments.bp)
+    app.register_blueprint(attendance.bp)
     
     # Comando personalizado para inicializar la BD con datos de ejemplo
     @app.cli.command()

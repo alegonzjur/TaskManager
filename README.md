@@ -318,8 +318,7 @@ Este proyecto está en desarrollo activo. Para contribuir:
 
 ## Licencia
 
-[Especificar licencia]
+
 
 ## Contacto
 
-[Tu información de contacto]

@@ -11,6 +11,77 @@ task_allowed_employees = db.Table('task_allowed_employees',
 )
 
 
+class Attendance(db.Model):
+    """Modelo para registro de fichajes (entrada/salida)"""
+    __tablename__ = 'attendance'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
+    
+    # Tiempos
+    check_in = db.Column(db.DateTime, nullable=False)  # Hora de entrada
+    check_out = db.Column(db.DateTime)  # Hora de salida (null si está fichado)
+    
+    # Ubicación y notas
+    location = db.Column(db.String(20), nullable=False)  # 'office' o 'home'
+    notes = db.Column(db.Text)  # Notas opcionales
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relación con empleado
+    employee = db.relationship('Employee', backref=db.backref('attendances', lazy='dynamic'))
+    
+    def __repr__(self):
+        return f'<Attendance {self.employee.name if self.employee else "Unknown"} - {self.check_in}>'
+    
+    def get_duration_minutes(self):
+        """Calcula la duración del fichaje en minutos"""
+        if not self.check_out:
+            # Si aún está fichado, calcular hasta ahora
+            duration = datetime.utcnow() - self.check_in
+        else:
+            duration = self.check_out - self.check_in
+        return int(duration.total_seconds() / 60)
+    
+    def get_duration_formatted(self):
+        """Retorna duración formateada como HH:MM"""
+        minutes = self.get_duration_minutes()
+        hours = minutes // 60
+        mins = minutes % 60
+        return f"{hours:02d}:{mins:02d}"
+    
+    def is_active(self):
+        """Verifica si el fichaje está activo (sin salida)"""
+        return self.check_out is None
+    
+    def to_dict(self):
+        """Convierte el objeto a diccionario"""
+        def to_iso_utc(dt):
+            if dt is None:
+                return None
+            if dt.tzinfo is None:
+                return dt.isoformat() + 'Z'
+            return dt.isoformat()
+        
+        return {
+            'id': self.id,
+            'employee_id': self.employee_id,
+            'employee_name': self.employee.name if self.employee else None,
+            'check_in': to_iso_utc(self.check_in),
+            'check_out': to_iso_utc(self.check_out),
+            'location': self.location,
+            'location_display': 'Oficina' if self.location == 'office' else 'Casa (Teletrabajo)',
+            'notes': self.notes,
+            'duration_minutes': self.get_duration_minutes(),
+            'duration_formatted': self.get_duration_formatted(),
+            'is_active': self.is_active(),
+            'created_at': to_iso_utc(self.created_at),
+            'updated_at': to_iso_utc(self.updated_at)
+        }
+
+
 class Employee(db.Model):
     """Modelo para empleados con autenticación"""
     __tablename__ = 'employees'

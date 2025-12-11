@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block title %}Fichaje - Task Manager{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2>
+            <i class="fas fa-clock"></i> Sistema de Fichaje
+        </h2>
+        <p class="text-muted">Registra tu entrada y salida del trabajo</p>
+    </div>
+</div>
+
+<!-- Estadísticas del día -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2">Trabajando Ahora</h6>
+                <h3 class="card-title mb-0" id="stat-working">0</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2">Han Fichado Hoy</h6>
+                <h3 class="card-title mb-0" id="stat-checked-in">0</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2">En Oficina</h6>
+                <h3 class="card-title mb-0" id="stat-office">0</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2">En Casa</h6>
+                <h3 class="card-title mb-0" id="stat-home">0</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Panel de Fichaje Principal -->
+<div class="row mb-4">
+    <div class="col-lg-6 mx-auto">
+        <div class="card shadow-lg border-0" id="check-panel">
+            <div class="card-body p-5 text-center">
+                <!-- Estado: Sin fichar -->
+                <div id="not-checked-in" style="display: none;">
+                    <div class="mb-4">
+                        <i class="fas fa-door-open" style="font-size: 4rem; color: #28a745;"></i>
+                    </div>
+                    <h3 class="mb-3">¡Buenos días!</h3>
+                    <p class="text-muted mb-4">¿Dónde vas a trabajar hoy?</p>
+                    
+                    <div class="d-grid gap-3">
+                        <button class="btn btn-success btn-lg" onclick="showCheckInModal('office')">
+                            <i class="fas fa-building"></i> Fichar en Oficina
+                        </button>
+                        <button class="btn btn-info btn-lg" onclick="showCheckInModal('home')">
+                            <i class="fas fa-home"></i> Fichar en Casa (Teletrabajo)
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Estado: Fichado -->
+                <div id="checked-in" style="display: none;">
+                    <div class="mb-4">
+                        <i class="fas fa-user-clock pulse" style="font-size: 4rem; color: #007bff;"></i>
+                    </div>
+                    <h3 class="mb-2">Estás trabajando</h3>
+                    <p class="text-muted mb-1" id="location-display"></p>
+                    <p class="text-muted small mb-3">Entrada: <span id="check-in-time"></span></p>
+                    
+                    <div class="mb-4">
+                        <h1 class="display-4 text-primary" id="work-timer">00:00:00</h1>
+                        <p class="text-muted">Tiempo trabajado</p>
+                    </div>
+                    
+                    <button class="btn btn-danger btn-lg px-5" onclick="showCheckOutModal()">
+                        <i class="fas fa-door-closed"></i> Fichar Salida
+                    </button>
+                </div>
+                
+                <!-- Loading -->
+                <div id="check-loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Cargando estado...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Panel de Admin (si es admin) -->
+{% if current_user.is_admin() %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0">
+                    <i class="fas fa-user-shield"></i> Panel de Administrador
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">Como administrador, puedes registrar fichajes para otros empleados</p>
+                <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#adminCheckModal">
+                    <i class="fas fa-users-cog"></i> Fichar por Otro Empleado
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Fichajes de Hoy -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="fas fa-list"></i> Fichajes de Hoy
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="today-attendances">
+                    <div class="text-center py-3">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2 text-muted">Cargando fichajes...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Confirmar Entrada -->
+<div class="modal fade" id="checkInModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-door-open"></i> Confirmar Entrada
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Vas a fichar tu entrada en <strong id="modal-location-text"></strong></p>
+                <div class="mb-3">
+                    <label for="check-in-notes" class="form-label">Notas (opcional)</label>
+                    <textarea class="form-control" id="check-in-notes" rows="2" 
+                              placeholder="Ej: Reunión a las 10:00"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="confirmCheckIn()">
+                    <i class="fas fa-check"></i> Confirmar Entrada
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Confirmar Salida -->
+<div class="modal fade" id="checkOutModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-door-closed"></i> Confirmar Salida
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Deseas registrar tu salida?</p>
+                <p class="text-muted">Tiempo trabajado: <strong id="modal-duration"></strong></p>
+                <div class="mb-3">
+                    <label for="check-out-notes" class="form-label">Notas (opcional)</label>
+                    <textarea class="form-control" id="check-out-notes" rows="2" 
+                              placeholder="Ej: Finalizado proyecto X"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" onclick="confirmCheckOut()">
+                    <i class="fas fa-sign-out-alt"></i> Confirmar Salida
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Admin - Fichar por otro -->
+{% if current_user.is_admin() %}
+<div class="modal fade" id="adminCheckModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">
+                    <i class="fas fa-user-shield"></i> Fichar por Otro Empleado
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="admin-employee-select" class="form-label">Empleado</label>
+                    <select class="form-select" id="admin-employee-select">
+                        <option value="">Cargando...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Acción</label>
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="admin-action" id="admin-check-in" value="in" checked>
+                        <label class="btn btn-outline-success" for="admin-check-in">
+                            <i class="fas fa-door-open"></i> Entrada
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="admin-action" id="admin-check-out" value="out">
+                        <label class="btn btn-outline-danger" for="admin-check-out">
+                            <i class="fas fa-door-closed"></i> Salida
+                        </label>
+                    </div>
+                </div>
+                <div class="mb-3" id="admin-location-select">
+                    <label class="form-label">Ubicación</label>
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="admin-location" id="admin-office" value="office" checked>
+                        <label class="btn btn-outline-primary" for="admin-office">
+                            <i class="fas fa-building"></i> Oficina
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="admin-location" id="admin-home" value="home">
+                        <label class="btn btn-outline-info" for="admin-home">
+                            <i class="fas fa-home"></i> Casa
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" onclick="adminCheckEmployee()">
+                    <i class="fas fa-check"></i> Registrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<style>
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+#check-panel {
+    border-top: 5px solid #007bff;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/attendance.js') }}"></script>
+{% endblock %}
