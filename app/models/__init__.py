@@ -228,7 +228,7 @@ class TaskAssignment(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
-    task_id = db.Column(db.Integer, db.ForeignKey('tasks.id'), nullable=False)
+    task_id = db.Column(db.Integer, db.ForeignKey('tasks.id'), nullable=True)  # NULL para descansos
     
     # Control de tiempo
     start_time = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -237,7 +237,7 @@ class TaskAssignment(db.Model):
     total_paused_duration = db.Column(db.Integer, default=0)  # Minutos totales pausados
     
     # Estado de la tarea
-    status = db.Column(db.String(20), default='en_progreso')  # en_progreso, completada, pausada
+    status = db.Column(db.String(20), default='en_progreso')  # en_progreso, completada, detenida, descanso
     notes = db.Column(db.Text)
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -263,12 +263,16 @@ class TaskAssignment(db.Model):
                 return dt.isoformat() + 'Z'
             return dt.isoformat()
         
+        # Determinar si es un descanso
+        is_break = self.status == 'descanso' or self.task_id is None
+        
         return {
             'id': self.id,
             'employee_id': self.employee_id,
             'employee_name': self.employee.name if self.employee else None,
             'task_id': self.task_id,
-            'task_name': self.task.name if self.task else None,
+            'task_name': '☕ Descanso' if is_break else (self.task.name if self.task else None),
+            'is_break': is_break,
             'start_time': to_iso_utc(self.start_time),
             'end_time': to_iso_utc(self.end_time),
             'pause_time': to_iso_utc(self.pause_time),

@@ -52,6 +52,13 @@
     </div>
 </div>
 
+<script>
+// Variables globales del usuario actual
+const CURRENT_USER_ID = {{ current_user.id }};
+const IS_ADMIN = {{ 'true' if current_user.is_admin() else 'false' }};
+console.log('Usuario actual:', { id: CURRENT_USER_ID, isAdmin: IS_ADMIN });
+</script>
+
 <!-- Estadísticas -->
 <div class="row mb-3">
     <div class="col-md-3">
@@ -71,9 +78,9 @@
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card bg-warning text-white">
+        <div class="card bg-info text-white" style="border-left: 4px solid #0dcaf0;">
             <div class="card-body">
-                <h6 class="card-subtitle mb-2">Pausadas</h6>
+                <h6 class="card-subtitle mb-2"><i class="fas fa-coffee"></i> En Descanso</h6>
                 <h3 class="card-title mb-0" id="stat-paused">0</h3>
             </div>
         </div>
@@ -81,7 +88,7 @@
     <div class="col-md-3">
         <div class="card bg-primary text-white">
             <div class="card-body">
-                <h6 class="card-subtitle mb-2">Empleados Trabajando</h6>
+                <h6 class="card-subtitle mb-2"><i class="fas fa-users"></i> Empleados Activos</h6>
                 <h3 class="card-title mb-0" id="stat-working">0</h3>
             </div>
         </div>
@@ -92,19 +99,30 @@
 <div class="row mb-3">
     <div class="col-12">
         <div class="card">
-            <div class="card-header bg-primary text-white">
+            <div class="card-header {% if current_user.is_admin() %}bg-primary{% else %}bg-success{% endif %} text-white">
                 <h5 class="mb-0">
-                    <i class="fas fa-users"></i> Control de Empleados
+                    {% if current_user.is_admin() %}
+                    <i class="fas fa-users-cog"></i> Control de Todos los Empleados
+                    <small class="float-end">Modo Administrador</small>
+                    {% else %}
+                    <i class="fas fa-user"></i> Mi Panel de Control
                     <small class="float-end">Actualización automática cada 10s</small>
+                    {% endif %}
                 </h5>
             </div>
             <div class="card-body">
+                {% if not current_user.is_admin() %}
+                <div class="alert alert-info mb-3">
+                    <i class="fas fa-info-circle"></i> 
+                    <strong>Vista de Empleado:</strong> Aquí puedes iniciar y gestionar tus propias tareas.
+                </div>
+                {% endif %}
                 <div id="employees-control">
                     <div class="text-center py-5">
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Cargando...</span>
                         </div>
-                        <p class="mt-2 text-muted">Cargando empleados...</p>
+                        <p class="mt-2 text-muted">Cargando...</p>
                     </div>
                 </div>
             </div>
@@ -117,7 +135,12 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header bg-light">
-                <h5 class="mb-0"><i class="fas fa-tasks"></i> Tareas en Progreso</h5>
+                <h5 class="mb-0">
+                    <i class="fas fa-tasks"></i> Tareas en Progreso de Todos los Empleados
+                    {% if not current_user.is_admin() %}
+                    <span class="badge bg-info ms-2">Solo Lectura</span>
+                    {% endif %}
+                </h5>
             </div>
             <div class="card-body">
                 <div id="active-assignments">
@@ -128,13 +151,13 @@
     </div>
 </div>
 
-<!-- Modal para iniciar tarea -->
+<!-- Modal para iniciar tarea o descanso -->
 <div class="modal fade" id="startTaskModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title">
-                    <i class="fas fa-play-circle"></i> Iniciar Tarea
+                    <i class="fas fa-play-circle"></i> ¿Qué vas a hacer?
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -145,27 +168,44 @@
                     <strong id="selected_employee_name"></strong>
                 </h6>
                 
-                <div class="mb-3">
-                    <label for="task_select" class="form-label">
-                        <i class="fas fa-tasks"></i> Selecciona una Tarea *
-                    </label>
-                    <select class="form-select form-select-lg" id="task_select" required>
-                        <option value="">Cargando tareas...</option>
-                    </select>
-                    <div class="form-text">Solo se muestran tareas activas</div>
+                <!-- Opción 1: Seleccionar Tarea -->
+                <div class="card mb-3">
+                    <div class="card-header bg-primary text-white">
+                        <i class="fas fa-tasks"></i> Iniciar una Tarea
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="task_select" class="form-label">Selecciona una Tarea</label>
+                            <select class="form-select form-select-lg" id="task_select">
+                                <option value="">Cargando tareas...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center my-3">
+                    <strong class="text-muted">--- O ---</strong>
+                </div>
+                
+                <!-- Opción 2: Tomar Descanso -->
+                <div class="card mb-3">
+                    <div class="card-header bg-info text-white">
+                        <i class="fas fa-coffee"></i> Tomar un Descanso
+                    </div>
+                    <div class="card-body text-center">
+                        <p class="mb-3">Registra tu tiempo de descanso</p>
+                        <button type="button" class="btn btn-info btn-lg" onclick="startBreak()">
+                            <i class="fas fa-coffee"></i> Iniciar Descanso
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="mb-3">
                     <label for="assignment_notes" class="form-label">
                         <i class="fas fa-sticky-note"></i> Notas (Opcional)
                     </label>
-                    <textarea class="form-control" id="assignment_notes" rows="3" 
-                              placeholder="Añade cualquier nota o comentario sobre esta tarea..."></textarea>
-                </div>
-                
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle"></i> 
-                    El temporizador comenzará automáticamente al iniciar la tarea.
+                    <textarea class="form-control" id="assignment_notes" rows="2" 
+                              placeholder="Añade cualquier nota..."></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -180,37 +220,76 @@
     </div>
 </div>
 
-<!-- Modal para completar tarea -->
-<div class="modal fade" id="completeTaskModal" tabindex="-1">
-    <div class="modal-dialog">
+<!-- Modal para detener tarea -->
+<div class="modal fade" id="stopTaskModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header bg-success text-white">
+            <div class="modal-header bg-warning text-dark">
                 <h5 class="modal-title">
-                    <i class="fas fa-check-circle"></i> Completar Tarea
+                    <i class="fas fa-stop-circle"></i> ¿Qué quieres hacer?
                 </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <input type="hidden" id="complete_assignment_id">
+                <input type="hidden" id="stop_assignment_id">
                 
-                <div class="alert alert-success">
-                    <h6><i class="fas fa-user"></i> <span id="complete_employee_name"></span></h6>
-                    <h6><i class="fas fa-tasks"></i> <span id="complete_task_name"></span></h6>
-                    <h6><i class="fas fa-clock"></i> Tiempo transcurrido: <span id="complete_duration"></span></h6>
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-user"></i> <span id="stop_employee_name"></span></h6>
+                    <h6><i class="fas fa-tasks"></i> <span id="stop_task_name"></span></h6>
+                    <p class="mb-0"><i class="fas fa-clock"></i> Tiempo trabajado: <strong id="stop_duration"></strong></p>
                 </div>
                 
-                <div class="mb-3">
-                    <label for="complete_notes" class="form-label">
-                        <i class="fas fa-comment"></i> Notas finales (Opcional)
+                <div class="row g-3">
+                    <!-- Opción 1: Simplemente Detener -->
+                    <div class="col-md-4">
+                        <div class="card h-100 border-warning" style="cursor: pointer;" onclick="selectStopAction('stop')">
+                            <div class="card-body text-center">
+                                <i class="fas fa-pause-circle fa-3x text-warning mb-3"></i>
+                                <h6>Simplemente Detener</h6>
+                                <p class="small text-muted">Parar temporalmente para cambiar a otra tarea</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Opción 2: Tomar Descanso -->
+                    <div class="col-md-4">
+                        <div class="card h-100 border-info" style="cursor: pointer;" onclick="selectStopAction('break')">
+                            <div class="card-body text-center">
+                                <i class="fas fa-coffee fa-3x text-info mb-3"></i>
+                                <h6>Tomar Descanso</h6>
+                                <p class="small text-muted">Registrar tiempo de descanso</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Opción 3: Marcar como Completada -->
+                    <div class="col-md-4">
+                        <div class="card h-100 border-success" style="cursor: pointer;" onclick="selectStopAction('complete')">
+                            <div class="card-body text-center">
+                                <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                                <h6>Marcar Completada</h6>
+                                <p class="small text-muted">Tarea finalizada exitosamente</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <label for="stop_notes" class="form-label">
+                        <i class="fas fa-sticky-note"></i> Notas (Opcional)
                     </label>
-                    <textarea class="form-control" id="complete_notes" rows="3" 
-                              placeholder="¿Cómo fue? ¿Algún comentario final?"></textarea>
+                    <textarea class="form-control" id="stop_notes" rows="2" 
+                              placeholder="Añade notas sobre lo realizado..."></textarea>
                 </div>
+                
+                <input type="hidden" id="selected_stop_action" value="">
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-success" onclick="completeTask()">
-                    <i class="fas fa-check"></i> Completar
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="button" class="btn btn-warning" onclick="confirmStopAction()" id="confirmStopBtn" disabled>
+                    <i class="fas fa-check"></i> Confirmar
                 </button>
             </div>
         </div>
@@ -302,8 +381,9 @@ async function refreshAll() {
 // Cargar empleados
 async function loadEmployees() {
     try {
-        const response = await axios.get('/employees/api?active_only=true');
-        allEmployees = response.data.employees;
+        const response = await fetch('/employees/api?active_only=true');
+        const data = await response.json();
+        allEmployees = data.employees;
     } catch (error) {
         console.error('Error al cargar empleados:', error);
     }
@@ -312,8 +392,9 @@ async function loadEmployees() {
 // Cargar tareas
 async function loadTasks() {
     try {
-        const response = await axios.get('/tasks/api?active_only=true');
-        allTasks = response.data.tasks;
+        const response = await fetch('/tasks/api?active_only=true');
+        const data = await response.json();
+        allTasks = data.tasks;
     } catch (error) {
         console.error('Error al cargar tareas:', error);
     }
@@ -322,8 +403,9 @@ async function loadTasks() {
 // Cargar asignaciones actuales
 async function loadCurrentAssignments() {
     try {
-        const response = await axios.get('/assignments/api/current');
-        currentAssignments = response.data.assignments;
+        const response = await fetch('/assignments/api/current');
+        const data = await response.json();
+        currentAssignments = data.assignments;
         displayActiveAssignments();
         displayEmployeesControl();
     } catch (error) {
@@ -334,20 +416,23 @@ async function loadCurrentAssignments() {
 // Cargar estadísticas
 async function loadStats() {
     try {
-        // En progreso
-        const inProgressResp = await axios.get('/assignments/api?status=en_progreso');
-        document.getElementById('stat-inprogress').textContent = inProgressResp.data.assignments.length;
+        // En progreso (trabajando)
+        const inProgressResp = await fetch('/assignments/api?status=en_progreso');
+        const inProgressData = await inProgressResp.json();
+        document.getElementById('stat-inprogreso').textContent = inProgressData.assignments.length;
         
         // Completadas hoy
         const today = new Date().toISOString().split('T')[0];
-        const completedResp = await axios.get(`/assignments/api?status=completada&start_date=${today}`);
-        document.getElementById('stat-completed').textContent = completedResp.data.assignments.length;
+        const completedResp = await fetch(`/assignments/api?status=completada&start_date=${today}`);
+        const completedData = await completedResp.json();
+        document.getElementById('stat-completed').textContent = completedData.assignments.length;
         
-        // Pausadas
-        const pausedResp = await axios.get('/assignments/api?status=pausada');
-        document.getElementById('stat-paused').textContent = pausedResp.data.assignments.length;
+        // En descanso
+        const breakResp = await fetch('/assignments/api?status=descanso');
+        const breakData = await breakResp.json();
+        document.getElementById('stat-paused').textContent = breakData.assignments.length;
         
-        // Empleados trabajando
+        // Empleados activos (trabajando o en descanso)
         const workingEmployees = new Set(currentAssignments.map(a => a.employee_id)).size;
         document.getElementById('stat-working').textContent = workingEmployees;
         
@@ -360,11 +445,20 @@ async function loadStats() {
 function displayEmployeesControl() {
     const container = document.getElementById('employees-control');
     
-    if (allEmployees.length === 0) {
+    // Si no es admin, filtrar solo el empleado actual
+    let employeesToShow = allEmployees;
+    if (!IS_ADMIN) {
+        employeesToShow = allEmployees.filter(emp => emp.id === CURRENT_USER_ID);
+        console.log('Modo empleado: mostrando solo usuario actual');
+    } else {
+        console.log('Modo admin: mostrando todos los empleados');
+    }
+    
+    if (employeesToShow.length === 0) {
         container.innerHTML = `
             <div class="alert alert-warning">
                 <i class="fas fa-exclamation-triangle"></i> 
-                No hay empleados activos disponibles.
+                ${IS_ADMIN ? 'No hay empleados activos disponibles.' : 'No se encontró tu perfil de empleado.'}
             </div>
         `;
         return;
@@ -372,79 +466,68 @@ function displayEmployeesControl() {
     
     let html = '<div class="row g-3">';
     
-    allEmployees.forEach(employee => {
+    employeesToShow.forEach(employee => {
         const assignment = currentAssignments.find(a => a.employee_id === employee.id);
         const isWorking = !!assignment;
+        const isBreak = assignment && assignment.status === 'descanso';
         
         html += '<div class="col-md-6 col-lg-4">';
-        html += `<div class="card employee-card ${isWorking ? 'working' : 'idle'} h-100">`;
+        html += `<div class="card employee-card ${isWorking ? (isBreak ? 'border-info' : 'working') : 'idle'} h-100">`;
         html += '<div class="card-body">';
         
         // Encabezado
         html += '<div class="d-flex justify-content-between align-items-center mb-2">';
         html += `<h5 class="card-title mb-0"><i class="fas fa-user"></i> ${employee.name}</h5>`;
-        html += `<span class="badge ${isWorking ? 'bg-info pulse' : 'bg-success'}">
-                    ${isWorking ? '<i class="fas fa-circle"></i> Trabajando' : '<i class="fas fa-check"></i> Disponible'}
-                 </span>`;
+        
+        if (isBreak) {
+            html += `<span class="badge bg-info pulse">
+                        <i class="fas fa-coffee"></i> En Descanso
+                     </span>`;
+        } else if (isWorking) {
+            html += `<span class="badge bg-primary pulse">
+                        <i class="fas fa-circle"></i> Trabajando
+                     </span>`;
+        } else {
+            html += `<span class="badge bg-success">
+                        <i class="fas fa-check"></i> Disponible
+                     </span>`;
+        }
         html += '</div>';
         
         html += `<p class="text-muted small mb-3"><i class="fas fa-briefcase"></i> ${employee.position || 'Sin puesto'}</p>`;
         
         if (isWorking) {
-            // Mostrar tarea actual y temporizador
+            // Mostrar tarea/descanso actual y temporizador
             html += '<div class="bg-white p-3 rounded mb-3">';
-            html += `<h6 class="mb-2"><i class="fas fa-tasks"></i> ${assignment.task_name}</h6>`;
             
-            // Mostrar estado de pausa si aplica
-            if (assignment.status === 'pausada') {
-                html += '<div class="alert alert-warning py-2 mb-2">';
-                html += '<i class="fas fa-pause-circle"></i> <strong>PAUSADA</strong>';
-                html += '</div>';
+            if (isBreak) {
+                html += `<h6 class="mb-2"><i class="fas fa-coffee"></i> ☕ Descanso</h6>`;
+            } else {
+                html += `<h6 class="mb-2"><i class="fas fa-tasks"></i> ${assignment.task_name}</h6>`;
             }
             
-            html += `<div class="timer-display text-primary" id="timer-${assignment.id}">00:00:00</div>`;
+            html += `<div class="timer-display ${isBreak ? 'text-info' : 'text-primary'}" id="timer-${assignment.id}">00:00:00</div>`;
             html += `<small class="text-muted">Iniciado: ${formatTime(assignment.start_time)}</small>`;
-            
-            // Mostrar tiempo pausado si existe
-            if (assignment.total_paused_duration && assignment.total_paused_duration > 0) {
-                html += `<div class="small text-warning mt-1">
-                            <i class="fas fa-pause"></i> Tiempo pausado: ${assignment.total_paused_duration} min
-                         </div>`;
-            }
             
             if (assignment.notes) {
                 html += `<p class="small mt-2 mb-0"><i class="fas fa-sticky-note"></i> ${assignment.notes}</p>`;
             }
             html += '</div>';
             
-            // Botones según estado
-            if (assignment.status === 'pausada') {
-                // Botón REANUDAR
-                html += `<button class="btn btn-warning btn-lg w-100 mb-2" onclick="resumeTask(${assignment.id})">
-                            <i class="fas fa-play"></i> REANUDAR
-                         </button>`;
-                html += `<button class="btn btn-danger w-100" onclick="openCompleteModal(${assignment.id})">
-                            <i class="fas fa-stop"></i> FINALIZAR
+            // Botón DETENER único
+            if (isBreak) {
+                html += `<button class="btn btn-info btn-lg w-100" onclick="openStopModal(${assignment.id})">
+                            <i class="fas fa-stop"></i> FINALIZAR DESCANSO
                          </button>`;
             } else {
-                // Botones PAUSAR y DETENER
-                html += `<div class="row g-2">`;
-                html += `<div class="col-6">
-                            <button class="btn btn-warning btn-lg w-100" onclick="pauseTask(${assignment.id})">
-                                <i class="fas fa-pause"></i> PAUSAR
-                            </button>
-                         </div>`;
-                html += `<div class="col-6">
-                            <button class="btn btn-danger btn-lg w-100" onclick="openCompleteModal(${assignment.id})">
-                                <i class="fas fa-stop"></i> DETENER
-                            </button>
-                         </div>`;
-                html += `</div>`;
+                html += `<button class="btn btn-danger btn-lg w-100" onclick="openStopModal(${assignment.id})">
+                            <i class="fas fa-stop"></i> DETENER
+                         </button>`;
             }
         } else {
-            // Botón START
+            // Botón INICIAR
             html += `<button class="btn btn-success btn-lg w-100" onclick="openStartModal(${employee.id}, '${employee.name}')">
-                        <i class="fas fa-play"></i> INICIAR TAREA
+                        <i class="fas fa-play"></i> INICIAR
                      </button>`;
         }
         
@@ -474,29 +557,21 @@ function initTimer(assignmentId, startTime, totalPausedMinutes = 0, status = 'en
     // Asegurar que totalPausedMinutes sea un número válido
     totalPausedMinutes = parseInt(totalPausedMinutes) || 0;
     
-    // DEBUG: Ver valores recibidos
-    console.log('InitTimer called:', {
-        assignmentId,
-        startTime,
-        startTimeDate: new Date(startTime),
-        totalPausedMinutes,
-        status,
-        now: new Date()
-    });
-    
     const updateTimer = () => {
         const timerElement = document.getElementById(`timer-${assignmentId}`);
         if (!timerElement) return;
         
-        if (status === 'pausada') {
-            // Si está pausada, no actualizar el tiempo
+        // Color según el tipo
+        if (status === 'descanso') {
+            timerElement.classList.add('text-info');
+            timerElement.classList.remove('text-primary', 'text-warning');
+        } else if (status === 'pausada' || status === 'detenida') {
             timerElement.classList.add('text-warning');
-            timerElement.classList.remove('text-primary');
-            return;
+            timerElement.classList.remove('text-primary', 'text-info');
+        } else {
+            timerElement.classList.add('text-primary');
+            timerElement.classList.remove('text-warning', 'text-info');
         }
-        
-        timerElement.classList.add('text-primary');
-        timerElement.classList.remove('text-warning');
         
         // Calcular tiempo transcurrido
         const startDate = new Date(startTime);
@@ -505,24 +580,12 @@ function initTimer(assignmentId, startTime, totalPausedMinutes = 0, status = 'en
         
         // Restar tiempo pausado (convertir minutos a milisegundos)
         const pausedMs = totalPausedMinutes * 60000;
-        const adjustedElapsed = Math.max(0, elapsed - pausedMs); // Asegurar que no sea negativo
+        const adjustedElapsed = Math.max(0, elapsed - pausedMs);
         
         // Calcular horas, minutos y segundos
         const hours = Math.floor(adjustedElapsed / 3600000);
         const minutes = Math.floor((adjustedElapsed % 3600000) / 60000);
         const seconds = Math.floor((adjustedElapsed % 60000) / 1000);
-        
-        // DEBUG: Primera vez que se ejecuta
-        if (!timerElement.dataset.initialized) {
-            console.log('Timer calculation:', {
-                assignmentId,
-                elapsed: elapsed / 1000 + 's',
-                pausedMs: pausedMs / 1000 + 's',
-                adjustedElapsed: adjustedElapsed / 1000 + 's',
-                hours, minutes, seconds
-            });
-            timerElement.dataset.initialized = 'true';
-        }
         
         timerElement.textContent = 
             `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
@@ -530,7 +593,8 @@ function initTimer(assignmentId, startTime, totalPausedMinutes = 0, status = 'en
     
     updateTimer(); // Actualizar inmediatamente
     
-    if (status !== 'pausada') {
+    // Actualizar cada segundo solo si está activo
+    if (status === 'en_progreso' || status === 'descanso') {
         timers[assignmentId] = setInterval(updateTimer, 1000);
     }
 }
@@ -566,16 +630,30 @@ function displayActiveAssignments() {
     html += '</tr></thead><tbody>';
     
     currentAssignments.forEach(assignment => {
+        const isBreak = assignment.status === 'descanso' || assignment.is_break;
+        const badgeColor = isBreak ? 'bg-info' : 'bg-primary';
+        const icon = isBreak ? 'fa-coffee' : 'fa-tasks';
+        
         html += '<tr>';
         html += `<td><strong>${assignment.employee_name}</strong></td>`;
-        html += `<td>${assignment.task_name}</td>`;
-        html += `<td><span class="badge bg-info" id="badge-timer-${assignment.id}">Calculando...</span></td>`;
-        html += `<td><small>${formatDateTime(assignment.start_time)}</small></td>`;
-        html += `<td class="text-center">
-                    <button class="btn btn-sm btn-danger" onclick="openCompleteModal(${assignment.id})">
-                        <i class="fas fa-stop"></i> Detener
-                    </button>
+        html += `<td>
+                    <i class="fas ${icon}"></i> ${assignment.task_name}
+                    ${isBreak ? '<span class="badge bg-info ms-1">Descanso</span>' : ''}
                  </td>`;
+        html += `<td><span class="badge ${badgeColor}" id="badge-timer-${assignment.id}">Calculando...</span></td>`;
+        html += `<td><small>${formatDateTime(assignment.start_time)}</small></td>`;
+        html += `<td class="text-center">`;
+        
+        // Solo admin puede detener tareas de otros
+        if (IS_ADMIN || assignment.employee_id === CURRENT_USER_ID) {
+            html += `<button class="btn btn-sm btn-danger" onclick="openStopModal(${assignment.id})">
+                        <i class="fas fa-stop"></i> Detener
+                     </button>`;
+        } else {
+            html += `<span class="badge bg-secondary">Solo Lectura</span>`;
+        }
+        
+        html += `</td>`;
         html += '</tr>';
     });
     
@@ -616,8 +694,9 @@ async function openStartModal(employeeId, employeeName) {
     taskSelect.innerHTML = '<option value="">Cargando tareas disponibles...</option>';
     
     try {
-        const response = await axios.get(`/tasks/api/available-for/${employeeId}`);
-        const availableTasks = response.data.tasks;
+        const response = await fetch(`/tasks/api/available-for/${employeeId}`);
+        const data = await response.json();
+        const availableTasks = data.tasks;
         
         taskSelect.innerHTML = '<option value="">Selecciona una tarea...</option>';
         
@@ -651,11 +730,21 @@ async function startTask() {
     }
     
     try {
-        await axios.post('/assignments/api', {
-            employee_id: parseInt(employeeId),
-            task_id: parseInt(taskId),
-            notes: notes
+        const response = await fetch('/assignments/api', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                employee_id: parseInt(employeeId),
+                task_id: parseInt(taskId),
+                is_break: false,
+                notes: notes
+            })
         });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al iniciar');
+        }
         
         showSuccess('¡Tarea iniciada! El temporizador está corriendo.');
         bootstrap.Modal.getInstance(document.getElementById('startTaskModal')).hide();
@@ -663,79 +752,182 @@ async function startTask() {
         await loadAll();
         
     } catch (error) {
-        const message = error.response?.data?.error || 'Error al iniciar tarea';
-        showError(message);
+        console.error('Error al iniciar tarea:', error);
+        showError('Error al iniciar tarea: ' + error.message);
     }
 }
 
-// Abrir modal para completar
-function openCompleteModal(assignmentId) {
+// Iniciar descanso
+async function startBreak() {
+    const employeeId = document.getElementById('selected_employee_id').value;
+    const notes = document.getElementById('assignment_notes').value || '☕ Descanso';
+    
+    try {
+        const response = await fetch('/assignments/api', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                employee_id: parseInt(employeeId),
+                is_break: true,
+                notes: notes
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al iniciar descanso');
+        }
+        
+        showSuccess('☕ ¡Descanso iniciado! Relájate.');
+        bootstrap.Modal.getInstance(document.getElementById('startTaskModal')).hide();
+        
+        await loadAll();
+        
+    } catch (error) {
+        console.error('Error al iniciar descanso:', error);
+        showError('Error al iniciar descanso: ' + error.message);
+    }
+}
+
+// Abrir modal para detener (con 3 opciones)
+function openStopModal(assignmentId) {
     const assignment = currentAssignments.find(a => a.id === assignmentId);
     if (!assignment) return;
     
-    document.getElementById('complete_assignment_id').value = assignmentId;
-    document.getElementById('complete_employee_name').textContent = assignment.employee_name;
-    document.getElementById('complete_task_name').textContent = assignment.task_name;
+    document.getElementById('stop_assignment_id').value = assignmentId;
+    document.getElementById('stop_employee_name').textContent = assignment.employee_name;
+    document.getElementById('stop_task_name').textContent = assignment.task_name;
+    document.getElementById('stop_notes').value = '';
+    document.getElementById('selected_stop_action').value = '';
+    document.getElementById('confirmStopBtn').disabled = true;
+    
+    // Limpiar selección visual
+    document.querySelectorAll('#stopTaskModal .card').forEach(card => {
+        card.classList.remove('border-3', 'shadow');
+    });
     
     // Calcular duración
     const elapsed = Date.now() - new Date(assignment.start_time).getTime();
     const hours = Math.floor(elapsed / 3600000);
     const minutes = Math.floor((elapsed % 3600000) / 60000);
-    document.getElementById('complete_duration').textContent = 
-        hours > 0 ? `${hours}h ${minutes}m` : `${minutes} minutos`;
+    document.getElementById('stop_duration').textContent = `${hours}h ${minutes}m`;
     
-    document.getElementById('complete_notes').value = assignment.notes || '';
-    
-    const modal = new bootstrap.Modal(document.getElementById('completeTaskModal'));
+    const modal = new bootstrap.Modal(document.getElementById('stopTaskModal'));
     modal.show();
 }
 
-// Pausar tarea
-async function pauseTask(assignmentId) {
-    if (!confirm('¿Deseas pausar esta tarea?')) return;
+// Seleccionar acción de detener
+function selectStopAction(action) {
+    document.getElementById('selected_stop_action').value = action;
+    document.getElementById('confirmStopBtn').disabled = false;
     
-    try {
-        await axios.put(`/assignments/api/${assignmentId}/pause`);
-        showSuccess('Tarea pausada. Puedes reanudarla cuando quieras.');
-        await loadAll();
-    } catch (error) {
-        showError('Error al pausar tarea');
+    // Resaltar la opción seleccionada
+    document.querySelectorAll('#stopTaskModal .card').forEach(card => {
+        card.classList.remove('border-3', 'shadow');
+    });
+    
+    const actionMap = {
+        'stop': 0,
+        'break': 1,
+        'complete': 2
+    };
+    
+    const cards = document.querySelectorAll('#stopTaskModal .card');
+    if (cards[actionMap[action]]) {
+        cards[actionMap[action]].classList.add('border-3', 'shadow');
     }
+    
+    // Actualizar texto del botón
+    const confirmBtn = document.getElementById('confirmStopBtn');
+    const actionText = {
+        'stop': 'Detener',
+        'break': 'Iniciar Descanso',
+        'complete': 'Completar Tarea'
+    };
+    confirmBtn.innerHTML = `<i class="fas fa-check"></i> ${actionText[action]}`;
 }
 
-// Reanudar tarea
-async function resumeTask(assignmentId) {
-    try {
-        await axios.put(`/assignments/api/${assignmentId}/resume`);
-        showSuccess('¡Tarea reanudada! El temporizador continúa.');
-        await loadAll();
-    } catch (error) {
-        const message = error.response?.data?.error || 'Error al reanudar tarea';
-        showError(message);
+// Confirmar acción de detener
+async function confirmStopAction() {
+    const assignmentId = document.getElementById('stop_assignment_id').value;
+    const action = document.getElementById('selected_stop_action').value;
+    const notes = document.getElementById('stop_notes').value;
+    
+    if (!action) {
+        alert('Por favor selecciona una opción');
+        return;
     }
-}
-
-// Completar tarea
-async function completeTask() {
-    const assignmentId = document.getElementById('complete_assignment_id').value;
-    const notes = document.getElementById('complete_notes').value;
     
     try {
-        await axios.put(`/assignments/api/${assignmentId}/complete`, { notes: notes });
+        let response;
+        let message;
         
-        showSuccess('¡Tarea completada correctamente!');
-        bootstrap.Modal.getInstance(document.getElementById('completeTaskModal')).hide();
-        
-        // Limpiar temporizador
-        if (timers[assignmentId]) {
-            clearInterval(timers[assignmentId]);
-            delete timers[assignmentId];
+        if (action === 'stop') {
+            // Simplemente detener
+            response = await fetch(`/assignments/api/${assignmentId}/stop`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes: notes })
+            });
+            message = 'Tarea detenida. Puedes iniciar otra cuando quieras.';
+            
+        } else if (action === 'break') {
+            // Detener tarea actual
+            response = await fetch(`/assignments/api/${assignmentId}/stop`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes: notes })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Error al detener');
+            }
+            
+            // Obtener el empleado de la asignación
+            const assignment = currentAssignments.find(a => a.id == assignmentId);
+            
+            // Iniciar descanso
+            response = await fetch('/assignments/api', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    employee_id: assignment.employee_id,
+                    is_break: true,
+                    notes: notes || '☕ Descanso'
+                })
+            });
+            message = '☕ Descanso iniciado. ¡Relájate!';
+            
+        } else if (action === 'complete') {
+            // Marcar como completada
+            response = await fetch(`/assignments/api/${assignmentId}/complete`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes: notes })
+            });
+            message = '✅ ¡Tarea completada exitosamente!';
+            
+            // Limpiar temporizador
+            if (timers[assignmentId]) {
+                clearInterval(timers[assignmentId]);
+                delete timers[assignmentId];
+            }
         }
         
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al procesar');
+        }
+        
+        showSuccess(message);
+        bootstrap.Modal.getInstance(document.getElementById('stopTaskModal')).hide();
+        
         await loadAll();
         
     } catch (error) {
-        showError('Error al completar tarea');
+        console.error('Error:', error);
+        showError('Error: ' + error.message);
     }
 }
 
@@ -769,8 +961,9 @@ async function loadHistory() {
         if (employeeId) url += `employee_id=${employeeId}&`;
         if (date) url += `start_date=${date}&`;
         
-        const response = await axios.get(url);
-        const assignments = response.data.assignments;
+        const response = await fetch(url);
+        const data = await response.json();
+        const assignments = data.assignments;
         
         if (assignments.length === 0) {
             container.innerHTML = '<div class="alert alert-info">No se encontraron asignaciones</div>';

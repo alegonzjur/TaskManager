@@ -59,6 +59,7 @@ def get_assignments():
 
 
 @bp.route('/api/<int:assignment_id>')
+@login_required
 def get_assignment(assignment_id):
     """API para obtener una asignación específica"""
     assignment = TaskAssignment.query.get_or_404(assignment_id)
@@ -66,30 +67,35 @@ def get_assignment(assignment_id):
 
 
 @bp.route('/api', methods=['POST'])
+@login_required
 def create_assignment():
-    """API para crear una nueva asignación (iniciar tarea)"""
+    """API para crear una nueva asignación (iniciar tarea o descanso)"""
     data = request.get_json()
     
     # Validaciones
     if not data.get('employee_id'):
         return jsonify({'error': 'El ID del empleado es obligatorio'}), 400
     
-    if not data.get('task_id'):
+    # Verificar si es un descanso
+    is_break = data.get('is_break', False)
+    
+    if not is_break and not data.get('task_id'):
         return jsonify({'error': 'El ID de la tarea es obligatorio'}), 400
     
-    # Verificar que el empleado y la tarea existen y están activos
+    # Verificar que el empleado existe y está activo
     employee = Employee.query.get(data['employee_id'])
     if not employee or not employee.is_active:
         return jsonify({'error': 'Empleado no encontrado o inactivo'}), 404
     
-    task = Task.query.get(data['task_id'])
-    if not task or not task.is_active:
-        return jsonify({'error': 'Tarea no encontrada o inactiva'}), 404
-    
-    # Verificar si el empleado ya tiene una tarea en progreso
+    # Verificar si el empleado ya tiene una tarea en progreso o descanso
     active_assignment = TaskAssignment.query.filter_by(
         employee_id=data['employee_id'],
         status='en_progreso'
+    ).first()
+    
+    active_break = TaskAssignment.query.filter_by(
+        employee_id=data['employee_id'],
+        status='descanso'
     ).first()
     
     if active_assignment:
@@ -98,20 +104,43 @@ def create_assignment():
             'active_assignment': active_assignment.to_dict()
         }), 400
     
+    if active_break:
+        return jsonify({
+            'error': 'El empleado ya está en descanso',
+            'active_assignment': active_break.to_dict()
+        }), 400
+    
     # Crear asignación
-    assignment = TaskAssignment(
-        employee_id=data['employee_id'],
-        task_id=data['task_id'],
-        start_time=datetime.utcnow(),
-        status='en_progreso',
-        notes=data.get('notes', '')
-    )
+    if is_break:
+        # Crear registro de descanso (sin task_id)
+        assignment = TaskAssignment(
+            employee_id=data['employee_id'],
+            task_id=None,
+            start_time=datetime.utcnow(),
+            status='descanso',
+            notes=data.get('notes', '☕ Descanso')
+        )
+        message = '☕ Descanso iniciado'
+    else:
+        # Verificar que la tarea existe y está activa
+        task = Task.query.get(data['task_id'])
+        if not task or not task.is_active:
+            return jsonify({'error': 'Tarea no encontrada o inactiva'}), 404
+        
+        assignment = TaskAssignment(
+            employee_id=data['employee_id'],
+            task_id=data['task_id'],
+            start_time=datetime.utcnow(),
+            status='en_progreso',
+            notes=data.get('notes', '')
+        )
+        message = f'Tarea iniciada: {task.name}'
     
     try:
         db.session.add(assignment)
         db.session.commit()
         return jsonify({
-            'message': 'Tarea asignada exitosamente',
+            'message': message,
             'assignment': assignment.to_dict()
         }), 201
     except Exception as e:
@@ -120,16 +149,21 @@ def create_assignment():
 
 
 @bp.route('/api/<int:assignment_id>/complete', methods=['PUT'])
+@login_required
 def complete_assignment(assignment_id):
-    """API para completar una asignación"""
+    """API para completar una asignación (marcarla como terminada)"""
     assignment = TaskAssignment.query.get_or_404(assignment_id)
     
+    # Puede completarse desde 'en_progreso' o 'detenida'
     if assignment.status == 'completada':
         return jsonify({'error': 'La tarea ya está completada'}), 400
     
     data = request.get_json() or {}
     
-    assignment.end_time = datetime.utcnow()
+    # Si aún no tiene end_time (viene de en_progreso), ponerlo ahora
+    if not assignment.end_time:
+        assignment.end_time = datetime.utcnow()
+    
     assignment.status = 'completada'
     
     if 'notes' in data:
@@ -138,7 +172,7 @@ def complete_assignment(assignment_id):
     try:
         db.session.commit()
         return jsonify({
-            'message': 'Tarea completada exitosamente',
+            'message': '¡Tarea completada exitosamente!',
             'assignment': assignment.to_dict(),
             'duration_minutes': assignment.get_duration_minutes()
         })
@@ -147,19 +181,20 @@ def complete_assignment(assignment_id):
         return jsonify({'error': str(e)}), 500
 
 
-@bp.route('/api/<int:assignment_id>/pause', methods=['PUT'])
-def pause_assignment(assignment_id):
-    """API para pausar una asignación"""
+@bp.route('/api/<int:assignment_id>/stop', methods=['PUT'])
+@login_required
+def stop_assignment(assignment_id):
+    """API para detener una asignación temporalmente (descanso)"""
     assignment = TaskAssignment.query.get_or_404(assignment_id)
     
     if assignment.status != 'en_progreso':
-        return jsonify({'error': 'Solo se pueden pausar tareas en progreso'}), 400
+        return jsonify({'error': 'Solo se pueden detener tareas en progreso'}), 400
     
     data = request.get_json() or {}
     
-    # Guardar el momento de la pausa
-    assignment.pause_time = datetime.utcnow()
-    assignment.status = 'pausada'
+    # Detener sin completar (para descanso o cambiar de tarea)
+    assignment.end_time = datetime.utcnow()
+    assignment.status = 'detenida'
     
     if 'notes' in data:
         assignment.notes = data['notes']
@@ -167,7 +202,7 @@ def pause_assignment(assignment_id):
     try:
         db.session.commit()
         return jsonify({
-            'message': 'Tarea pausada exitosamente',
+            'message': 'Tarea detenida. Puedes tomar un descanso o iniciar otra tarea.',
             'assignment': assignment.to_dict()
         })
     except Exception as e:
@@ -175,51 +210,9 @@ def pause_assignment(assignment_id):
         return jsonify({'error': str(e)}), 500
 
 
-@bp.route('/api/<int:assignment_id>/resume', methods=['PUT'])
-def resume_assignment(assignment_id):
-    """API para reanudar una asignación pausada"""
-    assignment = TaskAssignment.query.get_or_404(assignment_id)
-    
-    if assignment.status != 'pausada':
-        return jsonify({'error': 'Solo se pueden reanudar tareas pausadas'}), 400
-    
-    # Verificar si el empleado ya tiene otra tarea en progreso
-    active_assignment = TaskAssignment.query.filter(
-        TaskAssignment.employee_id == assignment.employee_id,
-        TaskAssignment.status == 'en_progreso',
-        TaskAssignment.id != assignment_id
-    ).first()
-    
-    if active_assignment:
-        return jsonify({
-            'error': 'El empleado ya tiene otra tarea en progreso',
-            'active_assignment': active_assignment.to_dict()
-        }), 400
-    
-    # Calcular tiempo que estuvo pausada
-    if assignment.pause_time:
-        pause_duration = datetime.utcnow() - assignment.pause_time
-        pause_minutes = int(pause_duration.total_seconds() / 60)
-        
-        # Acumular al tiempo total pausado
-        assignment.total_paused_duration = (assignment.total_paused_duration or 0) + pause_minutes
-    
-    assignment.status = 'en_progreso'
-    assignment.pause_time = None  # Limpiar tiempo de pausa
-    
-    try:
-        db.session.commit()
-        return jsonify({
-            'message': 'Tarea reanudada exitosamente',
-            'assignment': assignment.to_dict(),
-            'total_paused_minutes': assignment.total_paused_duration
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
 
 @bp.route('/api/<int:assignment_id>', methods=['PUT'])
+@login_required
 def update_assignment(assignment_id):
     """API para actualizar notas de una asignación"""
     assignment = TaskAssignment.query.get_or_404(assignment_id)
@@ -240,6 +233,7 @@ def update_assignment(assignment_id):
 
 
 @bp.route('/api/<int:assignment_id>', methods=['DELETE'])
+@login_required
 def delete_assignment(assignment_id):
     """API para eliminar una asignación"""
     assignment = TaskAssignment.query.get_or_404(assignment_id)
@@ -254,9 +248,12 @@ def delete_assignment(assignment_id):
 
 
 @bp.route('/api/current')
+@login_required
 def get_current_assignments():
-    """API para obtener todas las asignaciones actuales (en progreso)"""
-    assignments = TaskAssignment.query.filter_by(status='en_progreso').all()
+    """API para obtener todas las asignaciones actuales (en progreso y descansos)"""
+    assignments = TaskAssignment.query.filter(
+        TaskAssignment.status.in_(['en_progreso', 'descanso'])
+    ).all()
     
     return jsonify({
         'assignments': [assignment.to_dict() for assignment in assignments],
@@ -265,6 +262,7 @@ def get_current_assignments():
 
 
 @bp.route('/api/employee/<int:employee_id>/current')
+@login_required
 def get_employee_current_assignment(employee_id):
     """API para obtener la asignación actual de un empleado"""
     employee = Employee.query.get_or_404(employee_id)
