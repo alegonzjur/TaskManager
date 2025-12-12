@@ -161,6 +161,43 @@ def get_today_attendances():
     })
 
 
+@bp.route('/api')
+@login_required
+def get_attendances():
+    """Obtener fichajes filtrados por fecha"""
+    # Obtener parámetro de fecha (formato: YYYY-MM-DD)
+    date_str = request.args.get('date')
+    
+    if date_str:
+        try:
+            query_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Formato de fecha inválido. Use YYYY-MM-DD'}), 400
+    else:
+        # Si no se proporciona fecha, usar hoy
+        query_date = date.today()
+    
+    start_of_day = datetime.combine(query_date, datetime.min.time())
+    end_of_day = datetime.combine(query_date, datetime.max.time())
+    
+    # Si no es admin, solo ver los suyos
+    if current_user.is_admin():
+        attendances = Attendance.query.filter(
+            Attendance.check_in >= start_of_day,
+            Attendance.check_in <= end_of_day
+        ).order_by(Attendance.check_in.desc()).all()
+    else:
+        attendances = Attendance.query.filter(
+            Attendance.employee_id == current_user.id,
+            Attendance.check_in >= start_of_day,
+            Attendance.check_in <= end_of_day
+        ).order_by(Attendance.check_in.desc()).all()
+    
+    return jsonify({
+        'attendance': [a.to_dict() for a in attendances]
+    })
+
+
 @bp.route('/api/history')
 @login_required
 def get_attendance_history():

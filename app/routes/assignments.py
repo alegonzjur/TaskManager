@@ -154,9 +154,13 @@ def complete_assignment(assignment_id):
     """API para completar una asignación (marcarla como terminada)"""
     assignment = TaskAssignment.query.get_or_404(assignment_id)
     
-    # Puede completarse desde 'en_progreso' o 'detenida'
+    # Puede completarse desde 'en_progreso', 'pausada', o 'detenida' (legacy)
     if assignment.status == 'completada':
         return jsonify({'error': 'La tarea ya está completada'}), 400
+    
+    # Solo el empleado asignado o admin pueden completar
+    if not current_user.is_admin() and assignment.employee_id != current_user.id:
+        return jsonify({'error': 'No tienes permiso para completar esta tarea'}), 403
     
     data = request.get_json() or {}
     
@@ -184,17 +188,18 @@ def complete_assignment(assignment_id):
 @bp.route('/api/<int:assignment_id>/stop', methods=['PUT'])
 @login_required
 def stop_assignment(assignment_id):
-    """API para detener una asignación temporalmente (descanso)"""
+    """API para detener una asignación temporalmente (descanso o tarea)"""
     assignment = TaskAssignment.query.get_or_404(assignment_id)
     
-    if assignment.status != 'en_progreso':
-        return jsonify({'error': 'Solo se pueden detener tareas en progreso'}), 400
+    # Permitir detener tanto tareas en progreso como descansos
+    if assignment.status not in ['en_progreso', 'descanso']:
+        return jsonify({'error': 'Solo se pueden detener tareas en progreso o descansos activos'}), 400
     
     data = request.get_json() or {}
     
     # Detener sin completar (para descanso o cambiar de tarea)
     assignment.end_time = datetime.utcnow()
-    assignment.status = 'detenida'
+    assignment.status = 'pausada'  # Cambiado de 'detenida' a 'pausada'
     
     if 'notes' in data:
         assignment.notes = data['notes']
@@ -202,7 +207,7 @@ def stop_assignment(assignment_id):
     try:
         db.session.commit()
         return jsonify({
-            'message': 'Tarea detenida. Puedes tomar un descanso o iniciar otra tarea.',
+            'message': 'Tarea/descanso detenido. Puedes iniciar otra tarea.',
             'assignment': assignment.to_dict()
         })
     except Exception as e:
